@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow users to read and write their own profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Existing rules for other collections (assuming standard secure defaults or what they might have)
+    // If you have other collections like 'quizzes', add them here.
+    // For example:
+    // match /quizzes/{quizId} {
+    //   allow read: if request.auth != null;
+    //   allow write: if false; // Only admin can write quizzes
+    // }
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,15 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Freezed generates code that triggers false positives  
+    non_abstract_class_inherits_abstract_member: ignore
+    # Demote deprecated warnings to info
+    deprecated_member_use: info
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:
+    use_build_context_synchronously: true
