@@ -99,8 +99,6 @@ class _VerifyEmailScreenState extends ConsumerState<VerifyEmailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final user = ref.watch(authRepositoryProvider).currentUser;
 
     return Scaffold(

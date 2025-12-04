@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:rapidval/src/core/widgets/custom_app_bar.dart';
 
-import '../../auth/data/auth_repository.dart';
 import '../../quiz/data/quiz_repository.dart';
 import '../../quiz/domain/user_answer.dart';
+import '../../quiz/domain/quiz_category.dart';
+
+import 'history_filter_provider.dart';
+
+import 'widgets/history_shimmer.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -16,91 +19,46 @@ class HistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
-  final TextEditingController _searchController = TextEditingController();
-  String _searchQuery = '';
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final allResultsAsync = ref.watch(allQuizResultsProvider);
-    final user = ref.watch(authRepositoryProvider).currentUser;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final filterState = ref.watch(historyFilterProvider);
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: CustomScrollView(
+    if (!allResultsAsync.hasValue) {
+      return const HistoryShimmer();
+    }
+
+    return Container(
+      color: colorScheme.surface,
+      child: CustomScrollView(
+        key: const PageStorageKey('history_scroll_view'),
         physics: const BouncingScrollPhysics(),
         slivers: [
-          SliverCustomAppBar(
-            title: 'Quiz History',
-            subtitle: 'Review your past quizzes',
-            user: user,
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: colorScheme.outlineVariant.withOpacity(0.5),
-                        ),
-                      ),
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) {
-                          setState(() {
-                            _searchQuery = value.toLowerCase();
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Search history...',
-                          hintStyle: TextStyle(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(Icons.tune, color: colorScheme.primary),
-                  ),
-                ],
-              ),
-            ),
-          ),
           allResultsAsync.when(
             data: (results) {
               final filteredResults = results.where((result) {
                 final title = result.quiz.title.toLowerCase();
                 final category = result.quiz.category.toLowerCase();
-                return title.contains(_searchQuery) ||
-                    category.contains(_searchQuery);
+                final difficulty = result.quiz.difficulty;
+
+                final matchesSearch =
+                    title.contains(filterState.searchQuery) ||
+                    category.contains(filterState.searchQuery);
+
+                final matchesDifficulty =
+                    filterState.selectedDifficulty == null ||
+                    difficulty.toLowerCase() ==
+                        filterState.selectedDifficulty!.toLowerCase();
+
+                final matchesCategory =
+                    filterState.selectedCategories.isEmpty ||
+                    filterState.selectedCategories.any(
+                      (c) => category.toLowerCase().contains(c.toLowerCase()),
+                    );
+
+                return matchesSearch && matchesDifficulty && matchesCategory;
               }).toList();
 
               if (filteredResults.isEmpty) {
@@ -113,7 +71,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                         Icon(
                           Icons.history_toggle_off,
                           size: 64,
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                          color: colorScheme.onSurfaceVariant.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -131,7 +91,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               }
 
               return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     if (index.isOdd) return const SizedBox(height: 12);
@@ -172,8 +132,9 @@ class _HistoryCard extends ConsumerWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
+        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -186,18 +147,6 @@ class _HistoryCard extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // 1. Icon Container
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(iconData, color: iconColor, size: 22),
-                ),
-                const SizedBox(width: 12),
-
                 // 2. Title & Details
                 Expanded(
                   child: Column(
@@ -216,6 +165,8 @@ class _HistoryCard extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
+                          Icon(iconData, size: 16, color: iconColor),
+                          const SizedBox(width: 6),
                           Flexible(
                             child: Text(
                               result.quiz.category,
@@ -232,8 +183,8 @@ class _HistoryCard extends ConsumerWidget {
                             child: Icon(
                               Icons.circle,
                               size: 4,
-                              color: colorScheme.onSurfaceVariant.withOpacity(
-                                0.5,
+                              color: colorScheme.onSurfaceVariant.withValues(
+                                alpha: 0.5,
                               ),
                             ),
                           ),
@@ -289,38 +240,83 @@ class _HistoryCard extends ConsumerWidget {
 // -----------------------------------------------------------------------------
 
 IconData _getCategoryIcon(String category) {
-  final cat = category.toLowerCase();
-  if (cat.contains('history')) return Icons.history_edu;
-  if (cat.contains('science') ||
-      cat.contains('chemistry') ||
-      cat.contains('physics')) {
-    return Icons.science;
+  // Try to match exact enum display name first
+  try {
+    final catEnum = QuizCategory.fromString(category);
+    switch (catEnum) {
+      case QuizCategory.technologyAndCoding:
+        return Icons.computer;
+      case QuizCategory.scienceAndNature:
+        return Icons.science;
+      case QuizCategory.historyAndPolitics:
+        return Icons.history_edu;
+      case QuizCategory.artsAndLiterature:
+        return Icons.palette;
+      case QuizCategory.entertainmentAndPopCulture:
+        return Icons.movie;
+      case QuizCategory.geographyAndTravel:
+        return Icons.public;
+      case QuizCategory.businessAndFinance:
+        return Icons.attach_money;
+      case QuizCategory.healthAndLifestyle:
+        return Icons.favorite;
+      case QuizCategory.sportsAndRecreation:
+        return Icons.sports_basketball;
+      case QuizCategory.generalKnowledge:
+        return Icons.school;
+    }
+  } catch (_) {
+    // Fallback to loose matching if needed
+    final cat = category.toLowerCase();
+    if (cat.contains('history')) return Icons.history_edu;
+    if (cat.contains('science')) return Icons.science;
+    if (cat.contains('geography')) return Icons.public;
+    if (cat.contains('art')) return Icons.palette;
+    if (cat.contains('tech') || cat.contains('code')) return Icons.computer;
+    if (cat.contains('math')) return Icons.calculate;
+    if (cat.contains('music')) return Icons.music_note;
+    if (cat.contains('sport')) return Icons.sports_basketball;
+    if (cat.contains('film') || cat.contains('cinema')) return Icons.movie;
+    return Icons.school;
   }
-  if (cat.contains('geography') || cat.contains('world')) return Icons.public;
-  if (cat.contains('art')) return Icons.palette;
-  if (cat.contains('tech') || cat.contains('code')) return Icons.computer;
-  if (cat.contains('math')) return Icons.calculate;
-  if (cat.contains('music')) return Icons.music_note;
-  if (cat.contains('sport')) return Icons.sports_basketball;
-  if (cat.contains('film') || cat.contains('cinema')) return Icons.movie;
-  return Icons.school;
 }
 
 Color _getCategoryColor(String category) {
-  final cat = category.toLowerCase();
-  if (cat.contains('history')) return const Color(0xFF8B5CF6);
-  if (cat.contains('science')) return const Color(0xFFF59E0B);
-  if (cat.contains('geography')) return const Color(0xFF3B82F6);
-  if (cat.contains('art')) return const Color(0xFFEC4899);
-  if (cat.contains('tech')) return const Color(0xFF10B981);
-  if (cat.contains('film') || cat.contains('cinema')) {
-    return const Color(0xFFF43F5E);
+  try {
+    final catEnum = QuizCategory.fromString(category);
+    switch (catEnum) {
+      case QuizCategory.technologyAndCoding:
+        return const Color(0xFF10B981);
+      case QuizCategory.scienceAndNature:
+        return const Color(0xFFF59E0B);
+      case QuizCategory.historyAndPolitics:
+        return const Color(0xFF8B5CF6);
+      case QuizCategory.artsAndLiterature:
+        return const Color(0xFFEC4899);
+      case QuizCategory.entertainmentAndPopCulture:
+        return const Color(0xFFF43F5E);
+      case QuizCategory.geographyAndTravel:
+        return const Color(0xFF3B82F6);
+      case QuizCategory.businessAndFinance:
+        return const Color(0xFF0EA5E9);
+      case QuizCategory.healthAndLifestyle:
+        return const Color(0xFFEF4444);
+      case QuizCategory.sportsAndRecreation:
+        return const Color(0xFFF97316);
+      case QuizCategory.generalKnowledge:
+        return const Color(0xFF6366F1);
+    }
+  } catch (_) {
+    return const Color(0xFF6366F1);
   }
-  return const Color(0xFF6366F1);
 }
 
 Color _getDifficultyColor(String difficulty) {
   final diff = difficulty.toLowerCase();
+  if (diff == 'beginner') return const Color(0xFF22C55E);
+  if (diff == 'intermediate') return const Color(0xFFF59E0B);
+  if (diff == 'advanced') return const Color(0xFFEF4444);
+  // Fallback for old data
   if (diff == 'easy') return const Color(0xFF22C55E);
   if (diff == 'medium') return const Color(0xFFF59E0B);
   if (diff == 'hard') return const Color(0xFFEF4444);

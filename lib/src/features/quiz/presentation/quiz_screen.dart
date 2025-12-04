@@ -138,7 +138,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: Theme.of(
                         context,
-                      ).colorScheme.onSurface.withOpacity(0.5),
+                      ).colorScheme.onSurface.withValues(alpha: 0.5),
                       fontWeight: FontWeight.w600,
                     ),
                   ).animate().fadeIn(delay: 200.ms),
@@ -337,10 +337,10 @@ class _QuizHeader extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: isLowTime
-                        ? Colors.red.withOpacity(0.1)
+                        ? Colors.red.withValues(alpha: 0.1)
                         : Theme.of(
                             context,
-                          ).colorScheme.primaryContainer.withOpacity(0.4),
+                          ).colorScheme.primaryContainer.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: isLowTime ? Colors.red : Colors.transparent,
@@ -351,12 +351,12 @@ class _QuizHeader extends StatelessWidget {
                     children: [
                       AnimatedBuilder(
                         animation: pulseController,
-                        builder: (_, __) => Icon(
+                        builder: (context, child) => Icon(
                           Icons.timer_outlined,
                           size: 16,
                           color: isLowTime
-                              ? Colors.red.withOpacity(
-                                  0.6 + (pulseController.value * 0.4),
+                              ? Colors.red.withValues(
+                                  alpha: 0.6 + (pulseController.value * 0.4),
                                 )
                               : Theme.of(context).colorScheme.primary,
                         ),
@@ -417,7 +417,9 @@ class _QuestionDisplay extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
@@ -485,24 +487,26 @@ class _OptionTile extends StatelessWidget {
     final theme = Theme.of(context);
     final letters = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-    Color borderColor = theme.colorScheme.outline.withOpacity(0.2);
+    Color borderColor = theme.colorScheme.outline.withValues(alpha: 0.2);
     Color backgroundColor = theme.colorScheme.surface;
     Color letterBg = theme.colorScheme.surfaceContainerHighest;
     Color letterColor = theme.colorScheme.onSurface;
 
     if (isCorrectContext == true) {
       borderColor = Colors.green;
-      backgroundColor = Colors.green.withOpacity(0.05);
+      backgroundColor = Colors.green.withValues(alpha: 0.05);
       letterBg = Colors.green;
       letterColor = Colors.white;
     } else if (isWrongContext == true) {
       borderColor = Colors.red;
-      backgroundColor = Colors.red.withOpacity(0.05);
+      backgroundColor = Colors.red.withValues(alpha: 0.05);
       letterBg = Colors.red;
       letterColor = Colors.white;
     } else if (isSelected) {
       borderColor = theme.colorScheme.primary;
-      backgroundColor = theme.colorScheme.primaryContainer.withOpacity(0.2);
+      backgroundColor = theme.colorScheme.primaryContainer.withValues(
+        alpha: 0.2,
+      );
       letterBg = theme.colorScheme.primary;
       letterColor = theme.colorScheme.onPrimary;
     }
@@ -526,7 +530,7 @@ class _OptionTile extends StatelessWidget {
             boxShadow: isSelected && isCorrectContext == null
                 ? [
                     BoxShadow(
-                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -588,10 +592,10 @@ class _ExplanationCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(
           context,
-        ).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outline.withOpacity(0.1),
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.1),
         ),
       ),
       child: Column(
@@ -651,7 +655,7 @@ class _BottomActionBar extends StatelessWidget {
         color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -660,7 +664,7 @@ class _BottomActionBar extends StatelessWidget {
           top: BorderSide(
             color: Theme.of(
               context,
-            ).colorScheme.outlineVariant.withOpacity(0.5),
+            ).colorScheme.outlineVariant.withValues(alpha: 0.5),
           ),
         ),
       ),
@@ -692,7 +696,7 @@ class _BottomActionBar extends StatelessWidget {
                                 side: BorderSide(
                                   color: Theme.of(
                                     context,
-                                  ).colorScheme.outline.withOpacity(0.2),
+                                  ).colorScheme.outline.withValues(alpha: 0.2),
                                 ),
                                 shape: const StadiumBorder(),
                               ),
@@ -735,36 +739,20 @@ class _BottomActionBar extends StatelessWidget {
                   );
                 },
               )
-            : AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                transitionBuilder: (child, animation) => SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 1),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: FadeTransition(opacity: animation, child: child),
+            : SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: isAnswered ? onNext : null,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: const StadiumBorder(),
+                    elevation: isAnswered ? 2 : 0,
+                  ),
+                  child: const Text(
+                    'Next Question',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                child: isAnswered
-                    ? SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          key: const ValueKey('NextBtn'),
-                          onPressed: onNext,
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: const StadiumBorder(),
-                            elevation: 2,
-                          ),
-                          child: const Text(
-                            'Next Question',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
               ),
       ),
     );
@@ -799,7 +787,7 @@ MarkdownStyleSheet _buildProfessionalMarkdownStyle(
     codeblockDecoration: BoxDecoration(
       color: const Color(0xFF1E293B),
       borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
+      border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
     ),
     codeblockPadding: const EdgeInsets.all(16),
     code: TextStyle(
@@ -811,7 +799,7 @@ MarkdownStyleSheet _buildProfessionalMarkdownStyle(
     ),
     pPadding: EdgeInsets.zero,
     blockquoteDecoration: BoxDecoration(
-      color: colorScheme.secondaryContainer.withOpacity(0.2),
+      color: colorScheme.secondaryContainer.withValues(alpha: 0.2),
       borderRadius: BorderRadius.circular(4),
       border: Border(left: BorderSide(color: colorScheme.secondary, width: 4)),
     ),
@@ -825,7 +813,7 @@ MarkdownStyleSheet _buildProfessionalMarkdownStyle(
       fontWeight: FontWeight.bold,
     ),
     tableBorder: TableBorder.all(
-      color: colorScheme.outline.withOpacity(0.2),
+      color: colorScheme.outline.withValues(alpha: 0.2),
       width: 1,
     ),
     tableHead: theme.textTheme.bodyMedium?.copyWith(

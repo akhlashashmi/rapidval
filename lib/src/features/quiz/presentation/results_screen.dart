@@ -1,10 +1,15 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../domain/user_answer.dart';
 import '../domain/quiz_entity.dart';
 import 'quiz_screen.dart';
-import 'dart:math' as math;
 
 class ResultsScreen extends StatefulWidget {
   final QuizResult quizResult;
@@ -16,22 +21,48 @@ class ResultsScreen extends StatefulWidget {
 }
 
 class _ResultsScreenState extends State<ResultsScreen> {
-  bool _showConfetti = false;
+  final GlobalKey _globalKey = GlobalKey();
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.quizResult.percentage >= 70) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) setState(() => _showConfetti = true);
-      });
+  Future<void> _captureAndSharePng() async {
+    try {
+      // Find the render boundary
+      final boundary = _globalKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      // Convert to image
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      final pngBytes = byteData?.buffer.asUint8List();
+
+      if (pngBytes == null) return;
+
+      // Save to temporary file
+      final directory = await getTemporaryDirectory();
+      final imagePath = '${directory.path}/quiz_result.png';
+      final imageFile = File(imagePath);
+      await imageFile.writeAsBytes(pngBytes);
+
+      // Share
+      final result = widget.quizResult;
+      final text =
+          'I just scored ${result.percentage.toInt()}% on the ${result.quiz.title} quiz in RapidVal! 🚀\n\nCan you beat my score? Download the app now: https://play.google.com/store/apps/details?id=com.akhlashashmi.rapidval';
+
+      await Share.shareXFiles([XFile(imagePath)], text: text);
+    } catch (e) {
+      debugPrint('Error sharing: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to share results')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final result = widget.quizResult;
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -39,147 +70,206 @@ class _ResultsScreenState extends State<ResultsScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.close, color: colorScheme.onSurface),
-          onPressed: () => context.go('/dashboard'),
+        centerTitle: true,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: theme.brightness == Brightness.dark
+              ? Brightness.light
+              : Brightness.dark,
         ),
-      ),
-      body: Stack(
-        children: [
-          // Background Gradient
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                    colorScheme.surface,
-                  ],
+        title:
+            Text(
+                  'Quiz Summary',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                    letterSpacing: 0.5,
+                  ),
+                )
+                .animate()
+                .fadeIn(duration: 400.ms)
+                .slideY(begin: -0.5, end: 0, duration: 400.ms),
+        leadingWidth: 72,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+          child: IconButton(
+            onPressed: () => context.go('/dashboard'),
+            icon: const Icon(Icons.close, size: 20),
+            style: IconButton.styleFrom(
+              backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
+              foregroundColor: colorScheme.onSurface,
+              side: BorderSide(
+                color: colorScheme.outline.withValues(alpha: 0.1),
+              ),
+              elevation: 0,
+            ),
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+            child: IconButton(
+              onPressed: _captureAndSharePng,
+              icon: const Icon(Icons.ios_share_rounded, size: 20),
+              style: IconButton.styleFrom(
+                backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
+                foregroundColor: colorScheme.onSurface,
+                side: BorderSide(
+                  color: colorScheme.outline.withValues(alpha: 0.1),
                 ),
+                elevation: 0,
               ),
             ),
           ),
-
-          if (_showConfetti)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(painter: ParticlePainter()),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // Hidden Shareable Card (Rendered behind main content)
+          Center(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: RepaintBoundary(
+                key: _globalKey,
+                child: _ShareableResultCard(result: result),
               ),
             ),
-
-          SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                      children: [
-                        // 1. Result Header Card
-                        Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: _ResultSummaryCard(result: result)
-                              .animate()
-                              .scale(
-                                duration: 500.ms,
-                                curve: Curves.easeOutBack,
-                              )
-                              .fadeIn(),
-                        ),
-
-                        // 2. Section Title
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 8,
+          ),
+          // Main Content with background to cover the hidden card
+          Container(
+            color: colorScheme.surface,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).padding.top + 70,
                           ),
-                          child: Row(
-                            children: [
-                              Text(
-                                'Detailed Breakdown',
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurface.withOpacity(
-                                        0.6,
-                                      ),
-                                      letterSpacing: 1,
-                                    ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${result.correctAnswers}/${result.totalQuestions} Correct',
-                                style: Theme.of(context).textTheme.labelSmall
-                                    ?.copyWith(color: colorScheme.primary),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // 3. Questions List
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 8,
-                          ),
-                          itemCount: result.quiz.questions.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final question = result.quiz.questions[index];
-                            final userAnswer = result.answers.firstWhere(
-                              (a) => a.questionIndex == index,
-                              orElse: () => UserAnswer(
-                                questionIndex: index,
-                                selectedOptionIndex: -1,
-                                answeredAt: DateTime.now(),
-                              ),
-                            );
-
-                            return _QuestionResultTile(
-                                  index: index,
-                                  question: question,
-                                  userSelectedOptionIndex:
-                                      userAnswer.selectedOptionIndex,
-                                  isCorrect:
-                                      userAnswer.selectedOptionIndex ==
-                                      question.correctOptionIndex,
-                                  isSkipped:
-                                      userAnswer.selectedOptionIndex == -1,
-                                )
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: _ResultSummaryCard(result: result)
                                 .animate()
-                                .fadeIn(
-                                  delay: Duration(
-                                    milliseconds: 100 + (index * 30),
-                                  ),
+                                .slideY(
+                                  begin: 0.1,
+                                  end: 0,
+                                  duration: 600.ms,
+                                  curve: Curves.easeOutBack,
                                 )
-                                .slideY(begin: 0.1, end: 0);
-                          },
-                        ),
-                      ],
+                                .fadeIn(duration: 400.ms),
+                          ),
+                          const SizedBox(height: 32),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Detailed Breakdown',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface.withValues(
+                                      alpha: 0.6,
+                                    ),
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer
+                                        .withValues(alpha: 0.5),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    '${result.correctAnswers}/${result.totalQuestions} Correct',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            itemCount: result.quiz.questions.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final question = result.quiz.questions[index];
+                              final userAnswer = result.answers.firstWhere(
+                                (a) => a.questionIndex == index,
+                                orElse: () => UserAnswer(
+                                  questionIndex: index,
+                                  selectedOptionIndex: -1,
+                                  answeredAt: DateTime.now(),
+                                ),
+                              );
+
+                              return _QuestionResultTile(
+                                    index: index,
+                                    question: question,
+                                    userSelectedOptionIndex:
+                                        userAnswer.selectedOptionIndex,
+                                    isCorrect:
+                                        userAnswer.selectedOptionIndex ==
+                                        question.correctOptionIndex,
+                                    isSkipped:
+                                        userAnswer.selectedOptionIndex == -1,
+                                  )
+                                  .animate()
+                                  .fadeIn(
+                                    delay: Duration(
+                                      milliseconds: 200 + (index * 50),
+                                    ),
+                                    duration: 400.ms,
+                                  )
+                                  .slideX(
+                                    begin: 0.1,
+                                    end: 0,
+                                    delay: Duration(
+                                      milliseconds: 200 + (index * 50),
+                                    ),
+                                    curve: Curves.easeOutCubic,
+                                  );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-
-                // 4. Anchored Bottom Action Dock
-                _ActionDock(
-                  onReview: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            QuizScreen(isReviewMode: true, quizResult: result),
-                      ),
-                    );
-                  },
-                  onRetake: () =>
-                      context.push('/create-quiz', extra: result.quiz),
-                ),
-              ],
+                  _ActionDock(
+                        onReview: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => QuizScreen(
+                                isReviewMode: true,
+                                quizResult: result,
+                              ),
+                            ),
+                          );
+                        },
+                        onRetake: () =>
+                            context.push('/create-quiz', extra: result.quiz),
+                      )
+                      .animate()
+                      .fadeIn(delay: 600.ms)
+                      .slideY(begin: 1, end: 0, curve: Curves.easeOutCubic),
+                ],
+              ),
             ),
           ),
         ],
@@ -187,10 +277,6 @@ class _ResultsScreenState extends State<ResultsScreen> {
     );
   }
 }
-
-// -----------------------------------------------------------------------------
-// SUB-WIDGETS
-// -----------------------------------------------------------------------------
 
 class _ResultSummaryCard extends StatelessWidget {
   final QuizResult result;
@@ -204,7 +290,7 @@ class _ResultSummaryCard extends StatelessWidget {
   }
 
   String _getMessage() {
-    if (result.percentage >= 90) return 'Outstanding Performance!';
+    if (result.percentage >= 90) return 'Outstanding!';
     if (result.percentage >= 80) return 'Great Job!';
     if (result.percentage >= 60) return 'Good Effort';
     return 'Keep Practicing';
@@ -214,74 +300,84 @@ class _ResultSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scoreColor = _getScoreColor();
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: scoreColor.withOpacity(0.15),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(
-                width: 80,
-                height: 80,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      value: 1.0,
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      strokeWidth: 4,
-                    ),
-                    CircularProgressIndicator(
-                      value: result.percentage / 100,
-                      color: scoreColor,
-                      strokeWidth: 4,
-                      strokeCap: StrokeCap.round,
-                    ),
-                    Text(
-                      '${result.percentage.toInt()}%',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: scoreColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // const SizedBox(width: 24),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       _getMessage(),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.onSurface,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
                       'You completed the quiz in ${_formatDuration(result.completedAt.difference(result.startedAt))}.',
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 24),
+              SizedBox(
+                width: 100,
+                height: 100,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: 1.0,
+                        color: scoreColor.withValues(alpha: 0.1),
+                        strokeWidth: 8,
+                        strokeCap: StrokeCap.round,
+                      ),
+                    ),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: result.percentage / 100),
+                      duration: 1500.ms,
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) => SizedBox.expand(
+                        child: CircularProgressIndicator(
+                          value: value,
+                          color: scoreColor,
+                          strokeWidth: 8,
+                          strokeCap: StrokeCap.round,
+                        ),
+                      ),
+                    ),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: result.percentage),
+                      duration: 1500.ms,
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) => Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${value.toInt()}%',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: scoreColor,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -324,35 +420,32 @@ class _QuestionResultTile extends StatelessWidget {
     IconData statusIcon;
 
     if (isSkipped) {
-      statusColor = Colors.grey;
-      statusIcon = Icons.remove_circle_outline;
+      statusColor = colorScheme.onSurfaceVariant;
+      statusIcon = Icons.remove_circle_outline_rounded;
     } else if (isCorrect) {
-      statusColor = Colors.green;
-      statusIcon = Icons.check_circle;
+      statusColor = const Color(0xFF22C55E);
+      statusIcon = Icons.check_circle_rounded;
     } else {
-      statusColor = Colors.red;
-      statusIcon = Icons.cancel;
+      statusColor = const Color(0xFFEF4444);
+      statusIcon = Icons.cancel_rounded;
     }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
             child: Icon(statusIcon, color: statusColor, size: 20),
           ),
           const SizedBox(width: 16),
@@ -360,33 +453,74 @@ class _QuestionResultTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Question ${index + 1}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.5),
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Question ${index + 1}',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (isSkipped) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Skipped',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   question.question.replaceAll(RegExp(r'[\#\*]'), ''),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w600,
+                    height: 1.3,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
-                if (!isCorrect && !isSkipped)
-                  Text(
-                    'Correct: ${question.options[question.correctOptionIndex]}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.green,
-                      fontWeight: FontWeight.w500,
+                if (!isCorrect && !isSkipped) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: Color(0xFF22C55E),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            question.options[question.correctOptionIndex],
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: const Color(0xFF15803D),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
               ],
             ),
           ),
@@ -404,22 +538,22 @@ class _ActionDock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
             offset: const Offset(0, -5),
           ),
         ],
         border: Border(
           top: BorderSide(
-            color: Theme.of(
-              context,
-            ).colorScheme.outlineVariant.withOpacity(0.5),
+            color: colorScheme.outlineVariant.withValues(alpha: 0.2),
           ),
         ),
       ),
@@ -429,13 +563,16 @@ class _ActionDock extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onReview,
               icon: const Icon(Icons.visibility_outlined),
-              label: const Text('Review'),
+              label: const Text('Review Answers'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 side: BorderSide(
-                  color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                  color: colorScheme.outline.withValues(alpha: 0.2),
                 ),
-                shape: const StadiumBorder(),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                foregroundColor: colorScheme.onSurface,
               ),
             ),
           ),
@@ -443,11 +580,16 @@ class _ActionDock extends StatelessWidget {
           Expanded(
             child: FilledButton.icon(
               onPressed: onRetake,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded),
               label: const Text('Retake Quiz'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: const StadiumBorder(),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                backgroundColor: colorScheme.primary,
+                foregroundColor: colorScheme.onPrimary,
+                elevation: 0,
               ),
             ),
           ),
@@ -457,33 +599,137 @@ class _ActionDock extends StatelessWidget {
   }
 }
 
-class ParticlePainter extends CustomPainter {
-  final List<Particle> particles = List.generate(50, (i) => Particle());
+class _ShareableResultCard extends StatelessWidget {
+  final QuizResult result;
+
+  const _ShareableResultCard({required this.result});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    for (var p in particles) {
-      final paint = Paint()..color = p.color;
-      canvas.drawCircle(
-        Offset(size.width * p.x, size.height * p.y),
-        p.size,
-        paint,
-      );
-    }
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      width: 400,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.school_rounded, color: colorScheme.primary, size: 32),
+              const SizedBox(width: 12),
+              Text(
+                'RapidVal',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Text(
+            result.quiz.title,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 160,
+                height: 160,
+                child: CircularProgressIndicator(
+                  value: result.percentage / 100,
+                  strokeWidth: 16,
+                  strokeCap: StrokeCap.round,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  color: _getScoreColor(result.percentage),
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${result.percentage.toInt()}%',
+                    style: theme.textTheme.displayMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: _getScoreColor(result.percentage),
+                    ),
+                  ),
+                  Text(
+                    'Score',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${result.correctAnswers} out of ${result.totalQuestions} Correct',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+          Text(
+            'Can you beat my score?',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Get RapidVal on Play Store',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: colorScheme.outline,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class Particle {
-  final double x = math.Random().nextDouble();
-  final double y = math.Random().nextDouble() * 0.5;
-  final double size = math.Random().nextDouble() * 4 + 2;
-  final Color color = Color.fromRGBO(
-    math.Random().nextInt(255),
-    math.Random().nextInt(255),
-    math.Random().nextInt(255),
-    0.6,
-  );
+  Color _getScoreColor(double percentage) {
+    if (percentage >= 80) return const Color(0xFF22C55E);
+    if (percentage >= 60) return const Color(0xFFF59E0B);
+    return const Color(0xFFEF4444);
+  }
 }

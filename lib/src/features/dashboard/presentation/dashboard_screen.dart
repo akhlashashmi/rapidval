@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:rapidval/src/core/widgets/custom_app_bar.dart';
+
 import 'package:rapidval/src/features/quiz/domain/user_answer.dart';
 
-import '../../auth/data/auth_repository.dart';
 import '../../quiz/data/quiz_repository.dart';
 
 import '../../quiz/presentation/quiz_state.dart';
 import '../../quiz/presentation/quiz_controller.dart';
 import 'dashboard_stats_provider.dart';
+import 'widgets/dashboard_shimmer.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -22,68 +22,44 @@ class DashboardScreen extends ConsumerStatefulWidget {
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(authRepositoryProvider).currentUser;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final recentQuizzesAsync = ref.watch(recentQuizResultsProvider);
     final activeQuizProgressAsync = ref.watch(activeQuizProgressProvider);
     final statsAsync = ref.watch(dashboardStatsProvider);
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: CustomScrollView(
+    // Show shimmer if any of the data is not yet available
+    if (!statsAsync.hasValue ||
+        !activeQuizProgressAsync.hasValue ||
+        !recentQuizzesAsync.hasValue) {
+      return const DashboardShimmer();
+    }
+
+    // Once we have data, we can safely unwrap it
+    // We use maybeWhen or just value! since we checked hasValue
+    final stats = statsAsync.value!;
+    final activeProgress = activeQuizProgressAsync.value;
+    final recentQuizzes = recentQuizzesAsync.value ?? [];
+
+    return Container(
+      color: colorScheme.surface,
+      child: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          SliverCustomAppBar(
-            title: 'Your Dashboard',
-            subtitle:
-                'Welcome back, ${user?.displayName?.split(' ').first ?? 'User'} 👋',
-            user: user,
-          ),
           SliverPadding(
-            padding: const EdgeInsets.all(16).copyWith(top: 0),
+            padding: const EdgeInsets.all(16).copyWith(top: 8),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                // 1. Progress Section
+                _ProgressSection(stats: stats),
+
+                const SizedBox(height: 16),
+
                 // 2. Main Content Area (Active Quiz OR Recent Quizzes)
-                activeQuizProgressAsync.when(
-                  data: (progress) {
-                    if (progress != null) {
-                      return _ActiveQuizCard(state: progress.$1);
-                    } else {
-                      // Show Recent Quizzes when no active quiz
-                      return recentQuizzesAsync.when(
-                        data: (results) => _RecentQuizzesList(
-                          results: results.take(3).toList(),
-                        ),
-                        loading: () => const _LoadingCard(),
-                        error: (_, __) => const SizedBox.shrink(),
-                      );
-                    }
-                  },
-                  loading: () => const _LoadingCard(),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
-
-                const SizedBox(height: 24),
-
-                // 3. Progress Section
-                Text(
-                  'Your Progress',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                statsAsync.when(
-                  data: (stats) => _ProgressSection(stats: stats),
-                  loading: () => const SizedBox(
-                    height: 120,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
+                if (activeProgress != null)
+                  _ActiveQuizCard(state: activeProgress.$1)
+                else
+                  _RecentQuizzesList(results: recentQuizzes.take(3).toList()),
 
                 const SizedBox(height: 80), // Bottom padding
               ]),
@@ -95,9 +71,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 }
 
-// -----------------------------------------------------------------------------
 // WIDGETS
-// -----------------------------------------------------------------------------
 
 class _ActiveQuizCard extends ConsumerWidget {
   final QuizState state;
@@ -115,8 +89,9 @@ class _ActiveQuizCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,8 +244,9 @@ class _RecentQuizzesList extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -283,7 +259,7 @@ class _RecentQuizzesList extends StatelessWidget {
               color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           if (results.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
@@ -297,32 +273,15 @@ class _RecentQuizzesList extends StatelessWidget {
           else
             ListView.separated(
               shrinkWrap: true,
+              padding: EdgeInsets.zero,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: results.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final result = results[index];
                 return _QuizHistoryItem(result: result);
               },
             ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: () => context.push('/create-quiz'),
-              icon: const Icon(Icons.add),
-              label: const Text('New Quiz'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
-              ),
-            ),
-          ),
         ],
       ),
     ).animate().fadeIn().slideY(begin: 0.1, end: 0);
@@ -343,16 +302,6 @@ class _QuizHistoryItem extends StatelessWidget {
 
     return Row(
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(iconData, color: iconColor, size: 22),
-        ),
-        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,13 +317,19 @@ class _QuizHistoryItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
-              Text(
-                result.quiz.category,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              Row(
+                children: [
+                  Icon(iconData, size: 14, color: iconColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    result.quiz.category,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -383,7 +338,7 @@ class _QuizHistoryItem extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: _getScoreColor(result.percentage).withOpacity(0.1),
+            color: _getScoreColor(result.percentage).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
@@ -436,7 +391,7 @@ class _ProgressSection extends StatelessWidget {
                 icon: Icons.quiz_outlined,
                 value: '${stats.totalQuizzes}',
                 label: 'Quizzes Taken',
-                color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
                 iconColor: colorScheme.primary,
               ),
             ),
@@ -446,7 +401,7 @@ class _ProgressSection extends StatelessWidget {
                 icon: Icons.emoji_events_outlined,
                 value: '${stats.averageScore}%',
                 label: 'Avg. Score',
-                color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
                 iconColor: colorScheme.primary,
               ),
             ),
@@ -460,7 +415,7 @@ class _ProgressSection extends StatelessWidget {
             //     icon: Icons.local_fire_department_outlined,
             //     value: '${stats.streak}',
             //     label: 'Day Streak',
-            //     color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+            //     color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
             //     iconColor: const Color(0xFFF59E0B), // Amber/Orange
             //   ),
             // ),
@@ -469,8 +424,8 @@ class _ProgressSection extends StatelessWidget {
               child: _DetailCard(
                 icon: Icons.topic_outlined,
                 value: stats.bestTopic,
-                label: 'Best Topic',
-                color: colorScheme.surfaceContainerHighest.withOpacity(0.4),
+                label: 'Favorite Category',
+                color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
                 iconColor: const Color(0xFF8B5CF6), // Violet
                 isSmallText: true,
               ),
@@ -505,46 +460,59 @@ class _DetailCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
 
     return Container(
-      height: 160,
-      padding: const EdgeInsets.all(20),
+      height: 130,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
         children: [
-          Icon(icon, color: iconColor, size: 28),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: isSmallText || value.length > 8 ? 20 : 32,
-                      fontWeight: FontWeight.w900,
-                      color: colorScheme.onSurface,
-                      height: 1.0,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+          Positioned(
+            top: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: iconColor, size: 20),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: isSmallText || value.length > 8 ? 22 : 32,
+                    fontWeight: FontWeight.w900,
+                    color: colorScheme.onSurface,
+                    height: 1.2,
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -552,26 +520,7 @@ class _DetailCard extends StatelessWidget {
   }
 }
 
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      height: 200,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(32),
-      ),
-      child: const Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
 // HELPERS
-// -----------------------------------------------------------------------------
 
 IconData _getCategoryIcon(String category) {
   final cat = category.toLowerCase();

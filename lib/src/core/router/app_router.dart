@@ -13,7 +13,7 @@ import '../../features/onboarding/presentation/category_selection_screen.dart';
 import '../../features/history/presentation/history_screen.dart';
 import '../../features/quiz/domain/user_answer.dart';
 import '../services/local_storage/hive_storage_service.dart';
-import 'scaffold_with_nav_bar.dart';
+import '../../features/home/presentation/home_screen.dart';
 
 import '../../features/auth/presentation/verify_email_screen.dart';
 import '../../features/quiz/domain/quiz_entity.dart';
@@ -108,7 +108,7 @@ GoRouter goRouter(Ref ref) {
       // Shell Route for Bottom Navigation
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
-          return ScaffoldWithNavBar(navigationShell: navigationShell);
+          return HomeScreen(navigationShell: navigationShell);
         },
         branches: [
           StatefulShellBranch(

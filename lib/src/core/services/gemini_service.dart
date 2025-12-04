@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
 import 'package:firebase_ai/firebase_ai.dart';
+import 'package:rapidval/src/features/quiz/domain/quiz_category.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../features/dashboard/domain/quiz_config.dart';
 import '../../features/quiz/domain/quiz_entity.dart';
@@ -115,6 +116,9 @@ class GeminiService {
   }
 
   String _buildPrompt(QuizConfig config) {
+    // 2. Get the list of categories dynamically from the Enum
+    final categoriesList = QuizCategory.allCategoriesPromptString;
+
     return '''
   You are an expert quiz generator for a mobile app. Generate a quiz based on the user input: "${config.topic}".
   
@@ -122,8 +126,8 @@ class GeminiService {
   - Difficulty: ${config.difficulty.name}
   - Number of questions: ${config.questionCount}
   
-  Step 1: Classify the topic into EXACTLY one of these 10 categories:
-  [Technology & Coding, Science & Nature, History & Politics, Arts & Literature, Entertainment & Pop Culture, Geography & Travel, Business & Finance, Health & Lifestyle, Sports & Recreation, General Knowledge]
+  Step 1: Classify the topic into EXACTLY one of these ${QuizCategory.values.length} categories:
+  [$categoriesList]
 
   Step 2: Generate a list of exactly 5 related "topics". These will be used for similarity matching. They should range from specific to general.
   

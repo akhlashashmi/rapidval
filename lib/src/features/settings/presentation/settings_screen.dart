@@ -642,148 +642,125 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      extendBodyBehindAppBar: true,
-      body: Stack(
-        children: [
-          // Background subtle gradient
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                    colorScheme.surface,
+      // extendBodyBehindAppBar: true,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Account Section
+                _SectionHeader(title: 'Account'),
+                _SettingsGroup(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.badge_outlined,
+                      title: 'Name',
+                      subtitle: user?.displayName ?? 'Set a display name',
+                      onTap: () => _showUpdateNameBottomSheet(
+                        context,
+                        user?.displayName,
+                      ),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.person_outline,
+                      title: 'Email',
+                      subtitle: user?.email ?? 'Not signed in',
+                      showChevron: false,
+                    ),
+                    _SettingsTile(
+                      icon: Icons.logout,
+                      title: 'Sign Out',
+                      subtitle: 'Log out of your account',
+                      onTap: () => _showSignOutBottomSheet(context),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.delete_forever_outlined,
+                      title: 'Delete Account',
+                      subtitle: 'Permanently remove your data',
+                      titleColor: theme.colorScheme.error,
+                      iconColor: theme.colorScheme.error,
+                      onTap: () => _showDeleteAccountBottomSheet(context),
+                    ),
                   ],
                 ),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      // Account Section
-                      _SectionHeader(title: 'Account'),
-                      _SettingsGroup(
-                        children: [
-                          _SettingsTile(
-                            icon: Icons.badge_outlined,
-                            title: 'Name',
-                            subtitle: user?.displayName ?? 'Set a display name',
-                            onTap: () => _showUpdateNameBottomSheet(
-                              context,
-                              user?.displayName,
-                            ),
-                          ),
-                          _SettingsTile(
-                            icon: Icons.person_outline,
-                            title: 'Email',
-                            subtitle: user?.email ?? 'Not signed in',
-                            showChevron: false,
-                          ),
-                          _SettingsTile(
-                            icon: Icons.logout,
-                            title: 'Sign Out',
-                            subtitle: 'Log out of your account',
-                            onTap: () => _showSignOutBottomSheet(context),
-                          ),
-                          _SettingsTile(
-                            icon: Icons.delete_forever_outlined,
-                            title: 'Delete Account',
-                            subtitle: 'Permanently remove your data',
-                            titleColor: theme.colorScheme.error,
-                            iconColor: theme.colorScheme.error,
-                            onTap: () => _showDeleteAccountBottomSheet(context),
-                          ),
-                        ],
+
+                const SizedBox(height: 24),
+
+                // Preferences Section
+                _SectionHeader(title: 'Preferences'),
+                _SettingsGroup(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.category_outlined,
+                      title: 'Manage Topics',
+                      subtitle: 'Customize your learning interests',
+                      onTap: () => context.push('/manage-topics'),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.brightness_6_outlined,
+                      title: 'Theme',
+                      subtitle: _getThemeModeName(
+                        ref.watch(themeControllerProvider),
                       ),
+                      onTap: () => _showThemeSelectionBottomSheet(context, ref),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.alarm_rounded,
+                      title: 'Reminders',
+                      subtitle: 'Daily study reminders',
+                      trailing: Switch(value: true, onChanged: (val) {}),
+                    ),
+                  ],
+                ),
 
-                      const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-                      // Preferences Section
-                      _SectionHeader(title: 'Preferences'),
-                      _SettingsGroup(
-                        children: [
-                          _SettingsTile(
-                            icon: Icons.category_outlined,
-                            title: 'Manage Topics',
-                            subtitle: 'Customize your learning interests',
-                            onTap: () => context.push('/manage-topics'),
-                          ),
-                          _SettingsTile(
-                            icon: Icons.brightness_6_outlined,
-                            title: 'Theme',
-                            subtitle: _getThemeModeName(
-                              ref.watch(themeControllerProvider),
-                            ),
-                            onTap: () =>
-                                _showThemeSelectionBottomSheet(context, ref),
-                          ),
-                          _SettingsTile(
-                            icon: Icons.alarm_rounded,
-                            title: 'Reminders',
-                            subtitle: 'Daily study reminders',
-                            trailing: Switch(value: true, onChanged: (val) {}),
-                          ),
-                        ],
-                      ),
+                // Support Section
+                _SectionHeader(title: 'Support & About'),
+                _SettingsGroup(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.code_rounded,
+                      title: 'Developer Info',
+                      subtitle: 'Meet the creator',
+                      onTap: () => _showDeveloperProfileBottomSheet(context),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.info_outline,
+                      title: 'About RapidVal',
+                      subtitle: 'App version and information',
+                      onTap: () => _showAboutBottomSheet(context),
+                    ),
+                    _SettingsTile(
+                      icon: Icons.privacy_tip_outlined,
+                      title: 'Privacy Policy',
+                      subtitle: 'Read our privacy policy',
+                      onTap: () {
+                        // TODO: Open Privacy Policy URL
+                      },
+                    ),
+                    _SettingsTile(
+                      icon: Icons.description_outlined,
+                      title: 'Terms of Service',
+                      subtitle: 'Read our terms of service',
+                      onTap: () {
+                        // TODO: Open Terms URL
+                      },
+                    ),
+                  ],
+                ),
 
-                      const SizedBox(height: 24),
-
-                      // Support Section
-                      _SectionHeader(title: 'Support & About'),
-                      _SettingsGroup(
-                        children: [
-                          _SettingsTile(
-                            icon: Icons.code_rounded,
-                            title: 'Developer Info',
-                            subtitle: 'Meet the creator',
-                            onTap: () =>
-                                _showDeveloperProfileBottomSheet(context),
-                          ),
-                          _SettingsTile(
-                            icon: Icons.info_outline,
-                            title: 'About RapidVal',
-                            subtitle: 'App version and information',
-                            onTap: () => _showAboutBottomSheet(context),
-                          ),
-                          _SettingsTile(
-                            icon: Icons.privacy_tip_outlined,
-                            title: 'Privacy Policy',
-                            subtitle: 'Read our privacy policy',
-                            onTap: () {
-                              // TODO: Open Privacy Policy URL
-                            },
-                          ),
-                          _SettingsTile(
-                            icon: Icons.description_outlined,
-                            title: 'Terms of Service',
-                            subtitle: 'Read our terms of service',
-                            onTap: () {
-                              // TODO: Open Terms URL
-                            },
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 32),
-                      Center(
-                        child: Text(
-                          'Version 1.0.0',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 32),
+                Center(
+                  child: Text(
+                    'Version 1.0.0',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-          ),
-        ],
-      ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -819,18 +796,11 @@ class _SettingsGroup extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Column(
         children: [
@@ -839,8 +809,8 @@ class _SettingsGroup extends StatelessWidget {
             if (i < children.length - 1)
               Divider(
                 height: 1,
-                indent: 16,
-                endIndent: 16,
+                indent: 20,
+                endIndent: 20,
                 color: theme.colorScheme.outline.withValues(alpha: 0.2),
               ),
           ],
@@ -878,7 +848,7 @@ class _SettingsTile extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Row(
           children: [
             Icon(icon, size: 24, color: iconColor ?? theme.colorScheme.primary),
@@ -912,7 +882,9 @@ class _SettingsTile extends StatelessWidget {
               Icon(
                 Icons.chevron_right,
                 size: 20,
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.5,
+                ),
               ),
           ],
         ),
@@ -987,12 +959,12 @@ class _DeveloperProfileSheet extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: colorScheme.primary.withOpacity(0.2),
+                  color: colorScheme.primary.withValues(alpha: 0.2),
                   width: 2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: colorScheme.primary.withOpacity(0.1),
+                    color: colorScheme.primary.withValues(alpha: 0.1),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
@@ -1028,7 +1000,7 @@ class _DeveloperProfileSheet extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: colorScheme.secondaryContainer.withOpacity(0.5),
+                color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -1126,7 +1098,7 @@ class _SocialButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Icon(icon, color: color, size: 24),

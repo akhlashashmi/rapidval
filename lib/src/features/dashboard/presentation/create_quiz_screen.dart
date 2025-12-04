@@ -192,7 +192,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                               ),
                               filled: true,
                               fillColor: colorScheme.surfaceContainerHighest
-                                  .withOpacity(0.5),
+                                  .withValues(alpha: 0.5),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                                 borderSide: BorderSide.none,
@@ -217,10 +217,12 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               color: colorScheme.surfaceContainerHighest
-                                  .withOpacity(0.3),
+                                  .withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: colorScheme.outline.withOpacity(0.1),
+                                color: colorScheme.outline.withValues(
+                                  alpha: 0.1,
+                                ),
                               ),
                             ),
                             child: Column(
@@ -238,7 +240,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                                   children: [
                                     Expanded(
                                       child: _DifficultyOption(
-                                        label: 'Easy',
+                                        label: 'Beginner',
                                         value: QuizDifficulty.beginner,
                                         groupValue: config.difficulty,
                                         onChanged: (v) =>
@@ -250,7 +252,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: _DifficultyOption(
-                                        label: 'Medium',
+                                        label: 'Intermediate',
                                         value: QuizDifficulty.intermediate,
                                         groupValue: config.difficulty,
                                         onChanged: (v) =>
@@ -262,7 +264,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: _DifficultyOption(
-                                        label: 'Hard',
+                                        label: 'Advanced',
                                         value: QuizDifficulty.advanced,
                                         groupValue: config.difficulty,
                                         onChanged: (v) =>
@@ -275,7 +277,9 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                                 ),
                                 const SizedBox(height: 24),
                                 Divider(
-                                  color: colorScheme.outline.withOpacity(0.1),
+                                  color: colorScheme.outline.withValues(
+                                    alpha: 0.1,
+                                  ),
                                 ),
                                 const SizedBox(height: 24),
 
@@ -359,7 +363,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                       child: Container(
-                        color: colorScheme.surface.withOpacity(0.8),
+                        color: colorScheme.surface.withValues(alpha: 0.8),
                         child: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
@@ -472,10 +476,14 @@ class _DifficultyOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : colorScheme.surface,
+          color: isSelected
+              ? color.withValues(alpha: 0.1)
+              : colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? color : colorScheme.outline.withOpacity(0.2),
+            color: isSelected
+                ? color
+                : colorScheme.outline.withValues(alpha: 0.2),
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -537,7 +545,7 @@ class _SliderSetting extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withOpacity(0.5),
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -555,9 +563,9 @@ class _SliderSetting extends StatelessWidget {
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: colorScheme.primary,
-              inactiveTrackColor: colorScheme.primary.withOpacity(0.1),
+              inactiveTrackColor: colorScheme.primary.withValues(alpha: 0.1),
               thumbColor: colorScheme.primary,
-              overlayColor: colorScheme.primary.withOpacity(0.1),
+              overlayColor: colorScheme.primary.withValues(alpha: 0.1),
               trackHeight: 4,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
