@@ -3,7 +3,7 @@ description: "A new Flutter project."
 
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.10.1
@@ -42,6 +42,7 @@ dependencies:
   flutter_dotenv: ^6.0.0
   package_info_plus: ^9.0.0
   flutter_svg: ^2.0.10
+  firebase_crashlytics: ^5.0.5
 
 dev_dependencies:
   flutter_test:
