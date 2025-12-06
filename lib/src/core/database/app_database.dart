@@ -18,6 +18,14 @@ class StringListConverter extends TypeConverter<List<String>, String> {
   String toSql(List<String> value) => json.encode(value);
 }
 
+class IntListConverter extends TypeConverter<List<int>, String> {
+  const IntListConverter();
+  @override
+  List<int> fromSql(String fromDb) => List<int>.from(json.decode(fromDb));
+  @override
+  String toSql(List<int> value) => json.encode(value);
+}
+
 class UserAnswerListConverter extends TypeConverter<List<UserAnswer>, String> {
   const UserAnswerListConverter();
   @override
@@ -58,6 +66,11 @@ class Questions extends Table {
   IntColumn get correctOptionIndex => integer()();
   TextColumn get explanation => text()();
   TextColumn get hint => text().nullable()();
+
+  // New Columns for schema version 8
+  TextColumn get type => text().withDefault(const Constant('single'))();
+  TextColumn get correctIndices =>
+      text().map(const IntListConverter()).withDefault(const Constant('[]'))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -112,7 +125,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -143,6 +156,10 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(quizzes, quizzes.category);
         await m.addColumn(quizzes, quizzes.topics);
         await m.addColumn(questions, questions.hint);
+      }
+      if (from < 8) {
+        await m.addColumn(questions, questions.type);
+        await m.addColumn(questions, questions.correctIndices);
       }
     },
   );

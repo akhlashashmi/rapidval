@@ -15,7 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$UserAnswer {
 
- int get questionIndex; int get selectedOptionIndex; DateTime get answeredAt;
+ int get questionIndex; int get selectedOptionIndex; List<int> get selectedIndices; DateTime get answeredAt;
 /// Create a copy of UserAnswer
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +28,16 @@ $UserAnswerCopyWith<UserAnswer> get copyWith => _$UserAnswerCopyWithImpl<UserAns
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserAnswer&&(identical(other.questionIndex, questionIndex) || other.questionIndex == questionIndex)&&(identical(other.selectedOptionIndex, selectedOptionIndex) || other.selectedOptionIndex == selectedOptionIndex)&&(identical(other.answeredAt, answeredAt) || other.answeredAt == answeredAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UserAnswer&&(identical(other.questionIndex, questionIndex) || other.questionIndex == questionIndex)&&(identical(other.selectedOptionIndex, selectedOptionIndex) || other.selectedOptionIndex == selectedOptionIndex)&&const DeepCollectionEquality().equals(other.selectedIndices, selectedIndices)&&(identical(other.answeredAt, answeredAt) || other.answeredAt == answeredAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,questionIndex,selectedOptionIndex,answeredAt);
+int get hashCode => Object.hash(runtimeType,questionIndex,selectedOptionIndex,const DeepCollectionEquality().hash(selectedIndices),answeredAt);
 
 @override
 String toString() {
-  return 'UserAnswer(questionIndex: $questionIndex, selectedOptionIndex: $selectedOptionIndex, answeredAt: $answeredAt)';
+  return 'UserAnswer(questionIndex: $questionIndex, selectedOptionIndex: $selectedOptionIndex, selectedIndices: $selectedIndices, answeredAt: $answeredAt)';
 }
 
 
@@ -48,7 +48,7 @@ abstract mixin class $UserAnswerCopyWith<$Res>  {
   factory $UserAnswerCopyWith(UserAnswer value, $Res Function(UserAnswer) _then) = _$UserAnswerCopyWithImpl;
 @useResult
 $Res call({
- int questionIndex, int selectedOptionIndex, DateTime answeredAt
+ int questionIndex, int selectedOptionIndex, List<int> selectedIndices, DateTime answeredAt
 });
 
 
@@ -65,11 +65,12 @@ class _$UserAnswerCopyWithImpl<$Res>
 
 /// Create a copy of UserAnswer
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? questionIndex = null,Object? selectedOptionIndex = null,Object? answeredAt = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? questionIndex = null,Object? selectedOptionIndex = null,Object? selectedIndices = null,Object? answeredAt = null,}) {
   return _then(_self.copyWith(
 questionIndex: null == questionIndex ? _self.questionIndex : questionIndex // ignore: cast_nullable_to_non_nullable
 as int,selectedOptionIndex: null == selectedOptionIndex ? _self.selectedOptionIndex : selectedOptionIndex // ignore: cast_nullable_to_non_nullable
-as int,answeredAt: null == answeredAt ? _self.answeredAt : answeredAt // ignore: cast_nullable_to_non_nullable
+as int,selectedIndices: null == selectedIndices ? _self.selectedIndices : selectedIndices // ignore: cast_nullable_to_non_nullable
+as List<int>,answeredAt: null == answeredAt ? _self.answeredAt : answeredAt // ignore: cast_nullable_to_non_nullable
 as DateTime,
   ));
 }
@@ -155,10 +156,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int questionIndex,  int selectedOptionIndex,  DateTime answeredAt)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int questionIndex,  int selectedOptionIndex,  List<int> selectedIndices,  DateTime answeredAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UserAnswer() when $default != null:
-return $default(_that.questionIndex,_that.selectedOptionIndex,_that.answeredAt);case _:
+return $default(_that.questionIndex,_that.selectedOptionIndex,_that.selectedIndices,_that.answeredAt);case _:
   return orElse();
 
 }
@@ -176,10 +177,10 @@ return $default(_that.questionIndex,_that.selectedOptionIndex,_that.answeredAt);
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int questionIndex,  int selectedOptionIndex,  DateTime answeredAt)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int questionIndex,  int selectedOptionIndex,  List<int> selectedIndices,  DateTime answeredAt)  $default,) {final _that = this;
 switch (_that) {
 case _UserAnswer():
-return $default(_that.questionIndex,_that.selectedOptionIndex,_that.answeredAt);case _:
+return $default(_that.questionIndex,_that.selectedOptionIndex,_that.selectedIndices,_that.answeredAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -196,10 +197,10 @@ return $default(_that.questionIndex,_that.selectedOptionIndex,_that.answeredAt);
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int questionIndex,  int selectedOptionIndex,  DateTime answeredAt)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int questionIndex,  int selectedOptionIndex,  List<int> selectedIndices,  DateTime answeredAt)?  $default,) {final _that = this;
 switch (_that) {
 case _UserAnswer() when $default != null:
-return $default(_that.questionIndex,_that.selectedOptionIndex,_that.answeredAt);case _:
+return $default(_that.questionIndex,_that.selectedOptionIndex,_that.selectedIndices,_that.answeredAt);case _:
   return null;
 
 }
@@ -211,11 +212,18 @@ return $default(_that.questionIndex,_that.selectedOptionIndex,_that.answeredAt);
 @JsonSerializable()
 
 class _UserAnswer implements UserAnswer {
-  const _UserAnswer({required this.questionIndex, required this.selectedOptionIndex, required this.answeredAt});
+  const _UserAnswer({required this.questionIndex, required this.selectedOptionIndex, final  List<int> selectedIndices = const [], required this.answeredAt}): _selectedIndices = selectedIndices;
   factory _UserAnswer.fromJson(Map<String, dynamic> json) => _$UserAnswerFromJson(json);
 
 @override final  int questionIndex;
 @override final  int selectedOptionIndex;
+ final  List<int> _selectedIndices;
+@override@JsonKey() List<int> get selectedIndices {
+  if (_selectedIndices is EqualUnmodifiableListView) return _selectedIndices;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_selectedIndices);
+}
+
 @override final  DateTime answeredAt;
 
 /// Create a copy of UserAnswer
@@ -231,16 +239,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserAnswer&&(identical(other.questionIndex, questionIndex) || other.questionIndex == questionIndex)&&(identical(other.selectedOptionIndex, selectedOptionIndex) || other.selectedOptionIndex == selectedOptionIndex)&&(identical(other.answeredAt, answeredAt) || other.answeredAt == answeredAt));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _UserAnswer&&(identical(other.questionIndex, questionIndex) || other.questionIndex == questionIndex)&&(identical(other.selectedOptionIndex, selectedOptionIndex) || other.selectedOptionIndex == selectedOptionIndex)&&const DeepCollectionEquality().equals(other._selectedIndices, _selectedIndices)&&(identical(other.answeredAt, answeredAt) || other.answeredAt == answeredAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,questionIndex,selectedOptionIndex,answeredAt);
+int get hashCode => Object.hash(runtimeType,questionIndex,selectedOptionIndex,const DeepCollectionEquality().hash(_selectedIndices),answeredAt);
 
 @override
 String toString() {
-  return 'UserAnswer(questionIndex: $questionIndex, selectedOptionIndex: $selectedOptionIndex, answeredAt: $answeredAt)';
+  return 'UserAnswer(questionIndex: $questionIndex, selectedOptionIndex: $selectedOptionIndex, selectedIndices: $selectedIndices, answeredAt: $answeredAt)';
 }
 
 
@@ -251,7 +259,7 @@ abstract mixin class _$UserAnswerCopyWith<$Res> implements $UserAnswerCopyWith<$
   factory _$UserAnswerCopyWith(_UserAnswer value, $Res Function(_UserAnswer) _then) = __$UserAnswerCopyWithImpl;
 @override @useResult
 $Res call({
- int questionIndex, int selectedOptionIndex, DateTime answeredAt
+ int questionIndex, int selectedOptionIndex, List<int> selectedIndices, DateTime answeredAt
 });
 
 
@@ -268,11 +276,12 @@ class __$UserAnswerCopyWithImpl<$Res>
 
 /// Create a copy of UserAnswer
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? questionIndex = null,Object? selectedOptionIndex = null,Object? answeredAt = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? questionIndex = null,Object? selectedOptionIndex = null,Object? selectedIndices = null,Object? answeredAt = null,}) {
   return _then(_UserAnswer(
 questionIndex: null == questionIndex ? _self.questionIndex : questionIndex // ignore: cast_nullable_to_non_nullable
 as int,selectedOptionIndex: null == selectedOptionIndex ? _self.selectedOptionIndex : selectedOptionIndex // ignore: cast_nullable_to_non_nullable
-as int,answeredAt: null == answeredAt ? _self.answeredAt : answeredAt // ignore: cast_nullable_to_non_nullable
+as int,selectedIndices: null == selectedIndices ? _self._selectedIndices : selectedIndices // ignore: cast_nullable_to_non_nullable
+as List<int>,answeredAt: null == answeredAt ? _self.answeredAt : answeredAt // ignore: cast_nullable_to_non_nullable
 as DateTime,
   ));
 }

@@ -5,9 +5,11 @@ import 'package:rapidval/src/core/widgets/custom_app_bar.dart';
 import 'package:rapidval/src/features/auth/data/auth_repository.dart';
 import 'package:rapidval/src/features/history/presentation/history_filter_provider.dart';
 import 'package:rapidval/src/features/history/presentation/widgets/history_filter_bar.dart';
-
+import 'package:rapidval/src/features/dashboard/presentation/dashboard_stats_provider.dart';
 import 'package:rapidval/src/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:rapidval/src/features/history/presentation/history_screen.dart';
+import 'package:rapidval/src/features/history/presentation/history_selection_provider.dart';
+import 'package:rapidval/src/features/quiz/data/quiz_repository.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -40,8 +42,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
-      reverseDuration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
+      reverseDuration: const Duration(milliseconds: 200),
     );
 
     // Material 3 Emphasized Decelerate for a premium feel
@@ -147,6 +149,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final colorScheme = theme.colorScheme;
     final user = ref.watch(authRepositoryProvider).currentUser;
     final currentIndex = widget.navigationShell.currentIndex;
+    final selectionState = ref.watch(historySelectionProvider);
+    final isSelectionMode = selectionState.isNotEmpty && currentIndex == 1;
 
     final currentQuery = ref.watch(historyFilterProvider).searchQuery;
     if (_searchController.text != currentQuery) {
@@ -167,6 +171,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           letterSpacing: -0.5,
           height: 1.2,
         ),
+      );
+    } else if (isSelectionMode) {
+      titleWidget = Row(
+        children: [
+          IconButton(
+            onPressed: () =>
+                ref.read(historySelectionProvider.notifier).clear(),
+            icon: const Icon(Icons.close_rounded),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${selectionState.length} Selected',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ],
       );
     } else {
       titleWidget = LayoutBuilder(
@@ -311,7 +334,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       appBar: CustomAppBar(
         title: titleWidget,
         subtitle: '',
-        trailing: currentIndex == 1
+        trailing: isSelectionMode
+            ? IconButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Quizzes?'),
+                      content: Text(
+                        'Are you sure you want to delete ${selectionState.length} selected quizzes? This action cannot be undone.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            final ids = selectionState.toList();
+                            await ref
+                                .read(quizRepositoryProvider)
+                                .deleteQuizzes(ids);
+
+                            ref.invalidate(quizHistoryProvider);
+                            ref.invalidate(recentQuizResultsProvider);
+                            ref.invalidate(dashboardStatsProvider);
+
+                            ref.read(historySelectionProvider.notifier).clear();
+                          },
+                          child: Text(
+                            'Delete',
+                            style: TextStyle(color: colorScheme.error),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: colorScheme.onSurface,
+                ),
+              )
+            : currentIndex == 1
             ? AnimatedBuilder(
                 animation: _animController,
                 builder: (context, child) {

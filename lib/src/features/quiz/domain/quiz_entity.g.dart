@@ -14,6 +14,14 @@ _QuizQuestion _$QuizQuestionFromJson(Map<String, dynamic> json) =>
           .map((e) => e as String)
           .toList(),
       correctOptionIndex: (json['correctOptionIndex'] as num).toInt(),
+      correctIndices:
+          (json['correctIndices'] as List<dynamic>?)
+              ?.map((e) => (e as num).toInt())
+              .toList() ??
+          const [],
+      type:
+          $enumDecodeNullable(_$QuizQuestionTypeEnumMap, json['type']) ??
+          QuizQuestionType.single,
       explanation: json['explanation'] as String,
       hint: json['hint'] as String?,
     );
@@ -24,9 +32,16 @@ Map<String, dynamic> _$QuizQuestionToJson(_QuizQuestion instance) =>
       'question': instance.question,
       'options': instance.options,
       'correctOptionIndex': instance.correctOptionIndex,
+      'correctIndices': instance.correctIndices,
+      'type': _$QuizQuestionTypeEnumMap[instance.type]!,
       'explanation': instance.explanation,
       'hint': instance.hint,
     };
+
+const _$QuizQuestionTypeEnumMap = {
+  QuizQuestionType.single: 'single',
+  QuizQuestionType.multiple: 'multiple',
+};
 
 _Quiz _$QuizFromJson(Map<String, dynamic> json) => _Quiz(
   id: json['id'] as String,

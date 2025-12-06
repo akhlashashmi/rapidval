@@ -582,6 +582,26 @@ class $QuestionsTable extends Questions
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('single'),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<List<int>, String>
+  correctIndices = GeneratedColumn<String>(
+    'correct_indices',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  ).withConverter<List<int>>($QuestionsTable.$convertercorrectIndices);
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -591,6 +611,8 @@ class $QuestionsTable extends Questions
     correctOptionIndex,
     explanation,
     hint,
+    type,
+    correctIndices,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -653,6 +675,12 @@ class $QuestionsTable extends Questions
         hint.isAcceptableOrUnknown(data['hint']!, _hintMeta),
       );
     }
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    }
     return context;
   }
 
@@ -692,6 +720,16 @@ class $QuestionsTable extends Questions
         DriftSqlType.string,
         data['${effectivePrefix}hint'],
       ),
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      correctIndices: $QuestionsTable.$convertercorrectIndices.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}correct_indices'],
+        )!,
+      ),
     );
   }
 
@@ -702,6 +740,8 @@ class $QuestionsTable extends Questions
 
   static TypeConverter<List<String>, String> $converteroptions =
       const StringListConverter();
+  static TypeConverter<List<int>, String> $convertercorrectIndices =
+      const IntListConverter();
 }
 
 class Question extends DataClass implements Insertable<Question> {
@@ -712,6 +752,8 @@ class Question extends DataClass implements Insertable<Question> {
   final int correctOptionIndex;
   final String explanation;
   final String? hint;
+  final String type;
+  final List<int> correctIndices;
   const Question({
     required this.id,
     required this.quizId,
@@ -720,6 +762,8 @@ class Question extends DataClass implements Insertable<Question> {
     required this.correctOptionIndex,
     required this.explanation,
     this.hint,
+    required this.type,
+    required this.correctIndices,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -737,6 +781,12 @@ class Question extends DataClass implements Insertable<Question> {
     if (!nullToAbsent || hint != null) {
       map['hint'] = Variable<String>(hint);
     }
+    map['type'] = Variable<String>(type);
+    {
+      map['correct_indices'] = Variable<String>(
+        $QuestionsTable.$convertercorrectIndices.toSql(correctIndices),
+      );
+    }
     return map;
   }
 
@@ -749,6 +799,8 @@ class Question extends DataClass implements Insertable<Question> {
       correctOptionIndex: Value(correctOptionIndex),
       explanation: Value(explanation),
       hint: hint == null && nullToAbsent ? const Value.absent() : Value(hint),
+      type: Value(type),
+      correctIndices: Value(correctIndices),
     );
   }
 
@@ -765,6 +817,8 @@ class Question extends DataClass implements Insertable<Question> {
       correctOptionIndex: serializer.fromJson<int>(json['correctOptionIndex']),
       explanation: serializer.fromJson<String>(json['explanation']),
       hint: serializer.fromJson<String?>(json['hint']),
+      type: serializer.fromJson<String>(json['type']),
+      correctIndices: serializer.fromJson<List<int>>(json['correctIndices']),
     );
   }
   @override
@@ -778,6 +832,8 @@ class Question extends DataClass implements Insertable<Question> {
       'correctOptionIndex': serializer.toJson<int>(correctOptionIndex),
       'explanation': serializer.toJson<String>(explanation),
       'hint': serializer.toJson<String?>(hint),
+      'type': serializer.toJson<String>(type),
+      'correctIndices': serializer.toJson<List<int>>(correctIndices),
     };
   }
 
@@ -789,6 +845,8 @@ class Question extends DataClass implements Insertable<Question> {
     int? correctOptionIndex,
     String? explanation,
     Value<String?> hint = const Value.absent(),
+    String? type,
+    List<int>? correctIndices,
   }) => Question(
     id: id ?? this.id,
     quizId: quizId ?? this.quizId,
@@ -797,6 +855,8 @@ class Question extends DataClass implements Insertable<Question> {
     correctOptionIndex: correctOptionIndex ?? this.correctOptionIndex,
     explanation: explanation ?? this.explanation,
     hint: hint.present ? hint.value : this.hint,
+    type: type ?? this.type,
+    correctIndices: correctIndices ?? this.correctIndices,
   );
   Question copyWithCompanion(QuestionsCompanion data) {
     return Question(
@@ -811,6 +871,10 @@ class Question extends DataClass implements Insertable<Question> {
           ? data.explanation.value
           : this.explanation,
       hint: data.hint.present ? data.hint.value : this.hint,
+      type: data.type.present ? data.type.value : this.type,
+      correctIndices: data.correctIndices.present
+          ? data.correctIndices.value
+          : this.correctIndices,
     );
   }
 
@@ -823,7 +887,9 @@ class Question extends DataClass implements Insertable<Question> {
           ..write('options: $options, ')
           ..write('correctOptionIndex: $correctOptionIndex, ')
           ..write('explanation: $explanation, ')
-          ..write('hint: $hint')
+          ..write('hint: $hint, ')
+          ..write('type: $type, ')
+          ..write('correctIndices: $correctIndices')
           ..write(')'))
         .toString();
   }
@@ -837,6 +903,8 @@ class Question extends DataClass implements Insertable<Question> {
     correctOptionIndex,
     explanation,
     hint,
+    type,
+    correctIndices,
   );
   @override
   bool operator ==(Object other) =>
@@ -848,7 +916,9 @@ class Question extends DataClass implements Insertable<Question> {
           other.options == this.options &&
           other.correctOptionIndex == this.correctOptionIndex &&
           other.explanation == this.explanation &&
-          other.hint == this.hint);
+          other.hint == this.hint &&
+          other.type == this.type &&
+          other.correctIndices == this.correctIndices);
 }
 
 class QuestionsCompanion extends UpdateCompanion<Question> {
@@ -859,6 +929,8 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
   final Value<int> correctOptionIndex;
   final Value<String> explanation;
   final Value<String?> hint;
+  final Value<String> type;
+  final Value<List<int>> correctIndices;
   final Value<int> rowid;
   const QuestionsCompanion({
     this.id = const Value.absent(),
@@ -868,6 +940,8 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
     this.correctOptionIndex = const Value.absent(),
     this.explanation = const Value.absent(),
     this.hint = const Value.absent(),
+    this.type = const Value.absent(),
+    this.correctIndices = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   QuestionsCompanion.insert({
@@ -878,6 +952,8 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
     required int correctOptionIndex,
     required String explanation,
     this.hint = const Value.absent(),
+    this.type = const Value.absent(),
+    this.correctIndices = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        quizId = Value(quizId),
@@ -893,6 +969,8 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
     Expression<int>? correctOptionIndex,
     Expression<String>? explanation,
     Expression<String>? hint,
+    Expression<String>? type,
+    Expression<String>? correctIndices,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -904,6 +982,8 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
         'correct_option_index': correctOptionIndex,
       if (explanation != null) 'explanation': explanation,
       if (hint != null) 'hint': hint,
+      if (type != null) 'type': type,
+      if (correctIndices != null) 'correct_indices': correctIndices,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -916,6 +996,8 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
     Value<int>? correctOptionIndex,
     Value<String>? explanation,
     Value<String?>? hint,
+    Value<String>? type,
+    Value<List<int>>? correctIndices,
     Value<int>? rowid,
   }) {
     return QuestionsCompanion(
@@ -926,6 +1008,8 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
       correctOptionIndex: correctOptionIndex ?? this.correctOptionIndex,
       explanation: explanation ?? this.explanation,
       hint: hint ?? this.hint,
+      type: type ?? this.type,
+      correctIndices: correctIndices ?? this.correctIndices,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -956,6 +1040,14 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
     if (hint.present) {
       map['hint'] = Variable<String>(hint.value);
     }
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (correctIndices.present) {
+      map['correct_indices'] = Variable<String>(
+        $QuestionsTable.$convertercorrectIndices.toSql(correctIndices.value),
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -972,6 +1064,8 @@ class QuestionsCompanion extends UpdateCompanion<Question> {
           ..write('correctOptionIndex: $correctOptionIndex, ')
           ..write('explanation: $explanation, ')
           ..write('hint: $hint, ')
+          ..write('type: $type, ')
+          ..write('correctIndices: $correctIndices, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3034,6 +3128,8 @@ typedef $$QuestionsTableCreateCompanionBuilder =
       required int correctOptionIndex,
       required String explanation,
       Value<String?> hint,
+      Value<String> type,
+      Value<List<int>> correctIndices,
       Value<int> rowid,
     });
 typedef $$QuestionsTableUpdateCompanionBuilder =
@@ -3045,6 +3141,8 @@ typedef $$QuestionsTableUpdateCompanionBuilder =
       Value<int> correctOptionIndex,
       Value<String> explanation,
       Value<String?> hint,
+      Value<String> type,
+      Value<List<int>> correctIndices,
       Value<int> rowid,
     });
 
@@ -3111,6 +3209,17 @@ class $$QuestionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<List<int>, List<int>, String>
+  get correctIndices => $composableBuilder(
+    column: $table.correctIndices,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
   $$QuizzesTableFilterComposer get quizId {
     final $$QuizzesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -3174,6 +3283,16 @@ class $$QuestionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get correctIndices => $composableBuilder(
+    column: $table.correctIndices,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$QuizzesTableOrderingComposer get quizId {
     final $$QuizzesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -3228,6 +3347,15 @@ class $$QuestionsTableAnnotationComposer
 
   GeneratedColumn<String> get hint =>
       $composableBuilder(column: $table.hint, builder: (column) => column);
+
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<List<int>, String> get correctIndices =>
+      $composableBuilder(
+        column: $table.correctIndices,
+        builder: (column) => column,
+      );
 
   $$QuizzesTableAnnotationComposer get quizId {
     final $$QuizzesTableAnnotationComposer composer = $composerBuilder(
@@ -3288,6 +3416,8 @@ class $$QuestionsTableTableManager
                 Value<int> correctOptionIndex = const Value.absent(),
                 Value<String> explanation = const Value.absent(),
                 Value<String?> hint = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<List<int>> correctIndices = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuestionsCompanion(
                 id: id,
@@ -3297,6 +3427,8 @@ class $$QuestionsTableTableManager
                 correctOptionIndex: correctOptionIndex,
                 explanation: explanation,
                 hint: hint,
+                type: type,
+                correctIndices: correctIndices,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3308,6 +3440,8 @@ class $$QuestionsTableTableManager
                 required int correctOptionIndex,
                 required String explanation,
                 Value<String?> hint = const Value.absent(),
+                Value<String> type = const Value.absent(),
+                Value<List<int>> correctIndices = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => QuestionsCompanion.insert(
                 id: id,
@@ -3317,6 +3451,8 @@ class $$QuestionsTableTableManager
                 correctOptionIndex: correctOptionIndex,
                 explanation: explanation,
                 hint: hint,
+                type: type,
+                correctIndices: correctIndices,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

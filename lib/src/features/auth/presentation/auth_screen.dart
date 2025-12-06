@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../data/auth_repository.dart';
+
+import 'package:flutter/gestures.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -86,6 +90,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     );
   }
 
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri)) {
+      if (mounted) _showSnack('Could not launch $url', isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -96,6 +107,41 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                height: 1.4,
+              ),
+              children: [
+                const TextSpan(
+                  text: 'By continuing, you agree to RapidVal\'s ',
+                ),
+                TextSpan(
+                  text: 'Terms',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  recognizer: TapGestureRecognizer()
+                    ..onTap = () =>
+                        _launchUrl('https://rapidval.web.app/terms'),
+                ),
+                const TextSpan(text: ' and '),
+                TextSpan(
+                  text: 'Policy',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  recognizer: TapGestureRecognizer()
+                    ..onTap = () =>
+                        _launchUrl('https://rapidval.web.app/policy'),
+                ),
+                const TextSpan(text: '.'),
+              ],
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -230,10 +276,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         side: BorderSide(color: dimmerBorderColor),
                       ),
-                      icon: Image.network(
-                        'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c1/Google_%22G%22_logo.svg/1200px-Google_%22G%22_logo.svg.png',
-                        height: 18,
-                        width: 18,
+                      icon: SvgPicture.asset(
+                        'assets/images/google_icon.svg',
+                        height: 20,
+                        width: 20,
                       ),
                       label: Text(
                         'Continue with Google',

@@ -79,6 +79,27 @@ class UserRepository {
       rethrow;
     }
   }
+
+  Future<void> deleteUserData(String uid) async {
+    debugPrint('UserRepository: Deleting user data for $uid');
+    try {
+      final batch = _firestore.batch();
+
+      // Delete user profile
+      final userDoc = _firestore.collection('users').doc(uid);
+      batch.delete(userDoc);
+
+      // Delete user backup
+      final backupDoc = _firestore.collection('backups').doc(uid);
+      batch.delete(backupDoc);
+
+      await batch.commit();
+      debugPrint('UserRepository: User data deleted successfully');
+    } catch (e) {
+      debugPrint('UserRepository: Error deleting user data: $e');
+      rethrow;
+    }
+  }
 }
 
 @Riverpod(keepAlive: true)

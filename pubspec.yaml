@@ -38,6 +38,10 @@ dependencies:
   url_launcher: ^6.3.2
   font_awesome_flutter: ^10.12.0
   share_plus: ^12.0.1
+  http: ^1.6.0
+  flutter_dotenv: ^6.0.0
+  package_info_plus: ^9.0.0
+  flutter_svg: ^2.0.10
 
 dev_dependencies:
   flutter_test:
@@ -49,13 +53,23 @@ dev_dependencies:
   freezed: ^3.2.3
   json_serializable: ^6.8.0
   drift_dev: ^2.29.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/developer_image.png
+    - assets/images/google_icon.svg
+    - .env
 
 
 scripts:
   generate: flutter pub run build_runner build --delete-conflicting-outputs
   watch: flutter pub run build_runner watch --delete-conflicting-outputs
+
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/appicon.png"
+  min_sdk_android: 21

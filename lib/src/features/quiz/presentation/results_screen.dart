@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -7,8 +8,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../domain/user_answer.dart';
+
 import '../domain/quiz_entity.dart';
+import '../domain/user_answer.dart';
 import 'quiz_screen.dart';
 
 class ResultsScreen extends StatefulWidget {
@@ -26,7 +28,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
   Future<void> _captureAndSharePng() async {
     try {
       // Find the render boundary
-      final boundary = _globalKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      final boundary =
+          _globalKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
       if (boundary == null) return;
 
       // Convert to image
@@ -45,7 +49,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
       // Share
       final result = widget.quizResult;
       final text =
-          'I just scored ${result.percentage.toInt()}% on the ${result.quiz.title} quiz in RapidVal! 🚀\n\nCan you beat my score? Download the app now: https://play.google.com/store/apps/details?id=com.akhlashashmi.rapidval';
+          'I just scored ${result.percentage.toInt()}% on the ${result.quiz.title} quiz in RapidVal! 🚀\n\nCan you beat my score? Download the app now: https://play.google.com/store/apps/details?id=dev.akhlasahmed.rapidval';
 
       await Share.shareXFiles([XFile(imagePath)], text: text);
     } catch (e) {
@@ -93,7 +97,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
         leading: Padding(
           padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
           child: IconButton(
-            onPressed: () => context.go('/dashboard'),
+            onPressed: () => context.pop(),
             icon: const Icon(Icons.close, size: 20),
             style: IconButton.styleFrom(
               backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
@@ -218,16 +222,37 @@ class _ResultsScreenState extends State<ResultsScreen> {
                                 ),
                               );
 
+                              final isSkipped =
+                                  userAnswer.selectedOptionIndex == -1 &&
+                                  userAnswer.selectedIndices.isEmpty;
+
+                              bool isCorrect = false;
+                              if (!isSkipped) {
+                                if (question.type ==
+                                    QuizQuestionType.multiple) {
+                                  final userSet = userAnswer.selectedIndices
+                                      .toSet();
+                                  final correctSet = question.correctIndices
+                                      .toSet();
+                                  if (correctSet.isEmpty) {
+                                    correctSet.add(question.correctOptionIndex);
+                                  }
+                                  isCorrect =
+                                      userSet.length == correctSet.length &&
+                                      userSet.containsAll(correctSet);
+                                } else {
+                                  isCorrect =
+                                      userAnswer.selectedOptionIndex ==
+                                      question.correctOptionIndex;
+                                }
+                              }
+
                               return _QuestionResultTile(
                                     index: index,
                                     question: question,
-                                    userSelectedOptionIndex:
-                                        userAnswer.selectedOptionIndex,
-                                    isCorrect:
-                                        userAnswer.selectedOptionIndex ==
-                                        question.correctOptionIndex,
-                                    isSkipped:
-                                        userAnswer.selectedOptionIndex == -1,
+                                    userAnswer: userAnswer,
+                                    isCorrect: isCorrect,
+                                    isSkipped: isSkipped,
                                   )
                                   .animate()
                                   .fadeIn(
@@ -305,9 +330,9 @@ class _ResultSummaryCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+        color: colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.12)),
       ),
       child: Column(
         children: [
@@ -399,14 +424,14 @@ class _ResultSummaryCard extends StatelessWidget {
 class _QuestionResultTile extends StatelessWidget {
   final int index;
   final QuizQuestion question;
-  final int userSelectedOptionIndex;
+  final UserAnswer userAnswer;
   final bool isCorrect;
   final bool isSkipped;
 
   const _QuestionResultTile({
     required this.index,
     required this.question,
-    required this.userSelectedOptionIndex,
+    required this.userAnswer,
     required this.isCorrect,
     required this.isSkipped,
   });
@@ -430,25 +455,33 @@ class _QuestionResultTile extends StatelessWidget {
       statusIcon = Icons.cancel_rounded;
     }
 
+    // Determine correct options text
+    List<String> correctTexts = [];
+    if (question.type == QuizQuestionType.multiple) {
+      for (final idx in question.correctIndices) {
+        if (idx >= 0 && idx < question.options.length) {
+          correctTexts.add(question.options[idx]);
+        }
+      }
+      if (correctTexts.isEmpty && question.correctOptionIndex >= 0) {
+        correctTexts.add(question.options[question.correctOptionIndex]);
+      }
+    } else {
+      correctTexts.add(question.options[question.correctOptionIndex]);
+    }
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+        color: colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.12)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(statusIcon, color: statusColor, size: 20),
-          ),
-          const SizedBox(width: 16),
+          Icon(statusIcon, color: statusColor, size: 20),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -494,32 +527,208 @@ class _QuestionResultTile extends StatelessWidget {
                 ),
                 if (!isCorrect && !isSkipped) ...[
                   const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.check_rounded,
-                          size: 16,
-                          color: Color(0xFF22C55E),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            question.options[question.correctOptionIndex],
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: const Color(0xFF15803D),
-                              fontWeight: FontWeight.w600,
+                  if (question.type == QuizQuestionType.multiple) ...[
+                    Builder(
+                      builder: (context) {
+                        final userIndices = userAnswer.selectedIndices.toSet();
+                        final correctIndices = question.correctIndices.toSet();
+                        if (correctIndices.isEmpty) {
+                          correctIndices.add(question.correctOptionIndex);
+                        }
+                        final allIndices = {
+                          ...userIndices,
+                          ...correctIndices,
+                        }.toList()..sort();
+
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colorScheme.outline.withValues(alpha: 0.1),
                             ),
                           ),
-                        ),
-                      ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              for (int i = 0; i < allIndices.length; i++) ...[
+                                if (i > 0)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8.0,
+                                    ),
+                                    child: Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: colorScheme.outline.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                    ),
+                                  ),
+                                Builder(
+                                  builder: (context) {
+                                    final idx = allIndices[i];
+                                    final isSelected = userIndices.contains(
+                                      idx,
+                                    );
+                                    final isActuallyCorrect = correctIndices
+                                        .contains(idx);
+                                    final text = question.options[idx];
+
+                                    Color itemColor;
+                                    IconData itemIcon;
+                                    String label;
+
+                                    if (isSelected && !isActuallyCorrect) {
+                                      // Wrongly Selected
+                                      itemColor = const Color(0xFFEF4444);
+                                      itemIcon = Icons.cancel_outlined;
+                                      label = 'Incorrect selection';
+                                    } else if (!isSelected &&
+                                        isActuallyCorrect) {
+                                      // Missed
+                                      itemColor = const Color(0xFFF59E0B);
+                                      itemIcon = Icons.remove_circle_outline;
+                                      label = 'Missed correct option';
+                                    } else {
+                                      // Correctly Selected
+                                      itemColor = const Color(0xFF22C55E);
+                                      itemIcon = Icons.check_circle_outline;
+                                      label = 'Correct';
+                                    }
+
+                                    return Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 2,
+                                          ),
+                                          child: Icon(
+                                            itemIcon,
+                                            size: 16,
+                                            color: itemColor,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                text,
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color:
+                                                          colorScheme.onSurface,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                label,
+                                                style: theme
+                                                    .textTheme
+                                                    .labelSmall
+                                                    ?.copyWith(
+                                                      color: itemColor,
+                                                      fontSize: 10,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      },
                     ),
-                  ),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF22C55E).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Determine correct options text
+                          Builder(
+                            builder: (context) {
+                              List<String> correctTexts = [];
+                              correctTexts.add(
+                                question.options[question.correctOptionIndex],
+                              );
+
+                              return Column(
+                                children: [
+                                  for (
+                                    int i = 0;
+                                    i < correctTexts.length;
+                                    i++
+                                  ) ...[
+                                    if (i > 0)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 8.0,
+                                        ),
+                                        child: Divider(
+                                          height: 1,
+                                          thickness: 1,
+                                          color: const Color(
+                                            0xFF22C55E,
+                                          ).withValues(alpha: 0.2),
+                                        ),
+                                      ),
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 2),
+                                          child: Icon(
+                                            Icons.check_rounded,
+                                            size: 16,
+                                            color: Color(0xFF22C55E),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            correctTexts[i],
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: const Color(
+                                                    0xFF15803D,
+                                                  ),
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -541,16 +750,9 @@ class _ActionDock extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
         border: Border(
           top: BorderSide(
             color: colorScheme.outlineVariant.withValues(alpha: 0.2),
@@ -560,19 +762,13 @@ class _ActionDock extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: OutlinedButton.icon(
+            child: FilledButton.tonalIcon(
               onPressed: onReview,
               icon: const Icon(Icons.visibility_outlined),
               label: const Text('Review Answers'),
-              style: OutlinedButton.styleFrom(
+              style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                side: BorderSide(
-                  color: colorScheme.outline.withValues(alpha: 0.2),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                foregroundColor: colorScheme.onSurface,
+                shape: const StadiumBorder(),
               ),
             ),
           ),
@@ -584,9 +780,7 @@ class _ActionDock extends StatelessWidget {
               label: const Text('Retake Quiz'),
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+                shape: const StadiumBorder(),
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
                 elevation: 0,
@@ -608,7 +802,6 @@ class _ShareableResultCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       width: 400,

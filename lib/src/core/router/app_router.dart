@@ -19,6 +19,9 @@ import '../../features/auth/presentation/verify_email_screen.dart';
 import '../../features/quiz/domain/quiz_entity.dart';
 import '../../features/dashboard/presentation/create_quiz_screen.dart';
 import '../../features/auth/presentation/user_controller.dart';
+import '../../features/backup/presentation/backup_screen.dart';
+import '../../features/settings/presentation/legal/privacy_policy_screen.dart';
+import '../../features/settings/presentation/legal/terms_of_service_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -160,6 +163,21 @@ GoRouter goRouter(Ref ref) {
         path: '/manage-topics',
         builder: (context, state) =>
             const CategorySelectionScreen(isSettingsMode: true),
+        parentNavigatorKey: _rootNavigatorKey,
+      ),
+      GoRoute(
+        path: '/backups',
+        builder: (context, state) => const BackupScreen(),
+        parentNavigatorKey: _rootNavigatorKey,
+      ),
+      GoRoute(
+        path: '/privacy-policy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
+        parentNavigatorKey: _rootNavigatorKey,
+      ),
+      GoRoute(
+        path: '/terms-of-service',
+        builder: (context, state) => const TermsOfServiceScreen(),
         parentNavigatorKey: _rootNavigatorKey,
       ),
     ],

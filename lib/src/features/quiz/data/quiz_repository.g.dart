@@ -67,7 +67,7 @@ final class RecentQuizResultsProvider
         argument: null,
         retry: null,
         name: r'recentQuizResultsProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -87,7 +87,7 @@ final class RecentQuizResultsProvider
   }
 }
 
-String _$recentQuizResultsHash() => r'a0e7704d9f6f31ca447ee3402caf0b0242c83ed1';
+String _$recentQuizResultsHash() => r'99bcd2a3cf6ee6080ee528e9ff4bb1dfb8bb865f';
 
 @ProviderFor(allQuizResults)
 const allQuizResultsProvider = AllQuizResultsProvider._();
@@ -106,7 +106,7 @@ final class AllQuizResultsProvider
         argument: null,
         retry: null,
         name: r'allQuizResultsProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -126,7 +126,7 @@ final class AllQuizResultsProvider
   }
 }
 
-String _$allQuizResultsHash() => r'66fbe760bc5a138e12c5325551e5bf9fe0e1e999';
+String _$allQuizResultsHash() => r'cb0dd008df3ca694150e02efc2f79f2b6aba5632';
 
 @ProviderFor(activeQuizProgress)
 const activeQuizProgressProvider = ActiveQuizProgressProvider._();
@@ -147,7 +147,7 @@ final class ActiveQuizProgressProvider
         argument: null,
         retry: null,
         name: r'activeQuizProgressProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -168,4 +168,45 @@ final class ActiveQuizProgressProvider
 }
 
 String _$activeQuizProgressHash() =>
-    r'24d35b861b40e9333bee385c4ee851eaf57d5f76';
+    r'7519edbf3e57bcee61735369c60bfd3f85fc0583';
+
+@ProviderFor(quizHistory)
+const quizHistoryProvider = QuizHistoryProvider._();
+
+final class QuizHistoryProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<QuizHistoryItem>>,
+          List<QuizHistoryItem>,
+          FutureOr<List<QuizHistoryItem>>
+        >
+    with
+        $FutureModifier<List<QuizHistoryItem>>,
+        $FutureProvider<List<QuizHistoryItem>> {
+  const QuizHistoryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'quizHistoryProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$quizHistoryHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<QuizHistoryItem>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<QuizHistoryItem>> create(Ref ref) {
+    return quizHistory(ref);
+  }
+}
+
+String _$quizHistoryHash() => r'4aa1c036d29ab324fb21d09a1c12ade6b51b6bb8';

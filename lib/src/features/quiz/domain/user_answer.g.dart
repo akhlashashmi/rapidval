@@ -9,6 +9,11 @@ part of 'user_answer.dart';
 _UserAnswer _$UserAnswerFromJson(Map<String, dynamic> json) => _UserAnswer(
   questionIndex: (json['questionIndex'] as num).toInt(),
   selectedOptionIndex: (json['selectedOptionIndex'] as num).toInt(),
+  selectedIndices:
+      (json['selectedIndices'] as List<dynamic>?)
+          ?.map((e) => (e as num).toInt())
+          .toList() ??
+      const [],
   answeredAt: DateTime.parse(json['answeredAt'] as String),
 );
 
@@ -16,6 +21,7 @@ Map<String, dynamic> _$UserAnswerToJson(_UserAnswer instance) =>
     <String, dynamic>{
       'questionIndex': instance.questionIndex,
       'selectedOptionIndex': instance.selectedOptionIndex,
+      'selectedIndices': instance.selectedIndices,
       'answeredAt': instance.answeredAt.toIso8601String(),
     };
 

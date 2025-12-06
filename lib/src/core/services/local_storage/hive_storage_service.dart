@@ -7,12 +7,14 @@ part 'hive_storage_service.g.dart';
 class HiveStorageService implements LocalStorageService {
   static const String _settingsBox = 'settings';
   static const String _historyBox = 'history';
+  static const String _dailyQuizBox = 'daily_quiz';
 
   @override
   Future<void> init() async {
     await Hive.initFlutter();
     await Hive.openBox(_settingsBox);
     await Hive.openBox(_historyBox);
+    await Hive.openBox(_dailyQuizBox);
   }
 
   @override

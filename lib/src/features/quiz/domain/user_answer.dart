@@ -9,6 +9,7 @@ abstract class UserAnswer with _$UserAnswer {
   const factory UserAnswer({
     required int questionIndex,
     required int selectedOptionIndex,
+    @Default([]) List<int> selectedIndices,
     required DateTime answeredAt,
   }) = _UserAnswer;
 

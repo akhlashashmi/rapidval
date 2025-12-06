@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:drift/drift.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/database/app_database.dart' as db;
 import '../../../core/database/database_provider.dart';
@@ -9,6 +10,7 @@ import '../../quiz/domain/quiz_entity.dart';
 import '../../quiz/domain/user_answer.dart';
 import '../../../core/services/gemini_service.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../quiz/domain/quiz_history_item.dart';
 import '../../quiz/presentation/quiz_state.dart';
 
 part 'quiz_repository.g.dart';
@@ -20,6 +22,37 @@ class QuizRepository {
 
   QuizRepository(this._geminiService, this._db, this._authRepository);
 
+  Future<void> reportQuestion({
+    required String quizId,
+    required String quizTitle,
+    required String questionId,
+    required String questionText,
+    required List<String> options,
+    required String reportReason,
+    required String userId,
+    String? additionalComments,
+  }) async {
+    debugPrint('QuizRepository: reportQuestion called for $questionId');
+    try {
+      await FirebaseFirestore.instance.collection('reporting').add({
+        'quizId': quizId,
+        'quizTitle': quizTitle,
+        'questionId': questionId,
+        'questionText': questionText,
+        'options': options,
+        'reportReason': reportReason,
+        'userId': userId,
+        'additionalComments': additionalComments,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      });
+      debugPrint('QuizRepository: reportQuestion success');
+    } catch (e) {
+      debugPrint('QuizRepository: reportQuestion error: $e');
+      rethrow;
+    }
+  }
+
   Future<Quiz> generateQuiz(QuizConfig config) async {
     debugPrint(
       'QuizRepository: generateQuiz called for topic: ${config.topic}',
@@ -27,7 +60,7 @@ class QuizRepository {
     try {
       final quiz = await _geminiService.generateQuiz(config);
       debugPrint('QuizRepository: Quiz generated: ${quiz.id}');
-      await _saveQuizToDb(quiz);
+      await saveQuizToDb(quiz);
       return quiz;
     } catch (e) {
       debugPrint('QuizRepository: generateQuiz error: $e');
@@ -47,7 +80,7 @@ class QuizRepository {
           debugPrint(
             'QuizRepository: Quiz generated via stream: ${event.$2!.id}',
           );
-          await _saveQuizToDb(event.$2!);
+          await saveQuizToDb(event.$2!);
         }
         yield event;
       }
@@ -57,8 +90,8 @@ class QuizRepository {
     }
   }
 
-  Future<void> _saveQuizToDb(Quiz quiz) async {
-    debugPrint('QuizRepository: _saveQuizToDb called for ${quiz.id}');
+  Future<void> saveQuizToDb(Quiz quiz) async {
+    debugPrint('QuizRepository: saveQuizToDb called for ${quiz.id}');
     final userId = _authRepository.currentUser?.uid ?? '';
     await _db.transaction(() async {
       await _db
@@ -88,6 +121,8 @@ class QuizRepository {
                 correctOptionIndex: question.correctOptionIndex,
                 explanation: question.explanation,
                 hint: Value(question.hint),
+                type: Value(question.type.name),
+                correctIndices: Value(question.correctIndices),
               ),
             );
       }
@@ -166,7 +201,7 @@ class QuizRepository {
     final List<QuizResult> domainResults = [];
 
     for (final row in results) {
-      final quiz = await _getQuizById(row.quizId);
+      final quiz = await getQuizById(row.quizId);
       if (quiz != null) {
         domainResults.add(
           QuizResult(
@@ -208,7 +243,7 @@ class QuizRepository {
     final List<QuizResult> domainResults = [];
 
     for (final row in results) {
-      final quiz = await _getQuizById(row.quizId);
+      final quiz = await getQuizById(row.quizId);
       if (quiz != null) {
         domainResults.add(
           QuizResult(
@@ -231,6 +266,58 @@ class QuizRepository {
       'QuizRepository: getAllResults found ${domainResults.length} results',
     );
     return domainResults;
+  }
+
+  Future<List<QuizHistoryItem>> getQuizHistory() async {
+    debugPrint('QuizRepository: getQuizHistory called');
+    final userId = _authRepository.currentUser?.uid ?? '';
+
+    final query = _db.select(_db.quizzes).join([
+      drift.leftOuterJoin(
+        _db.quizResults,
+        _db.quizResults.quizId.equalsExp(_db.quizzes.id) &
+            _db.quizResults.userId.equals(userId),
+      ),
+    ])..where(_db.quizzes.userId.equals(userId));
+
+    final rows = await query.get();
+    final List<QuizHistoryItem> history = [];
+
+    for (final row in rows) {
+      final quizRow = row.readTable(_db.quizzes);
+      final resultRow = row.readTableOrNull(_db.quizResults);
+
+      final quiz = await getQuizById(quizRow.id);
+      if (quiz != null) {
+        QuizResult? result;
+        if (resultRow != null) {
+          result = QuizResult(
+            quizId: resultRow.quizId,
+            quiz: quiz,
+            answers: resultRow.answers,
+            startedAt: resultRow.completedAt.subtract(
+              const Duration(minutes: 5),
+            ),
+            completedAt: resultRow.completedAt,
+            correctAnswers: resultRow.score,
+            totalQuestions: resultRow.totalQuestions,
+            percentage: resultRow.percentage,
+          );
+        }
+
+        history.add(QuizHistoryItem(quiz: quiz, result: result));
+      }
+    }
+
+    // Sort by most recent activity (completedAt or createdAt)
+    history.sort((a, b) {
+      final aTime = a.result?.completedAt ?? a.quiz.createdAt;
+      final bTime = b.result?.completedAt ?? b.quiz.createdAt;
+      return bTime.compareTo(aTime);
+    });
+
+    debugPrint('QuizRepository: getQuizHistory found ${history.length} items');
+    return history;
   }
 
   Future<void> saveQuizProgress(QuizState state, int timePerQuestion) async {
@@ -273,7 +360,7 @@ class QuizRepository {
       return null;
     }
 
-    final quiz = await _getQuizById(progress.quizId);
+    final quiz = await getQuizById(progress.quizId);
     if (quiz == null) {
       debugPrint(
         'QuizRepository: getQuizProgress - quiz not found for progress',
@@ -302,7 +389,18 @@ class QuizRepository {
     debugPrint('QuizRepository: clearQuizProgress success');
   }
 
-  Future<Quiz?> _getQuizById(String id) async {
+  Future<void> deleteQuizzes(List<String> quizIds) async {
+    debugPrint('QuizRepository: deleteQuizzes called for $quizIds');
+    final userId = _authRepository.currentUser?.uid ?? '';
+    await _db.transaction(() async {
+      await (_db.delete(
+        _db.quizzes,
+      )..where((t) => t.id.isIn(quizIds) & t.userId.equals(userId))).go();
+    });
+    debugPrint('QuizRepository: deleteQuizzes success');
+  }
+
+  Future<Quiz?> getQuizById(String id) async {
     final quizRow = await (_db.select(
       _db.quizzes,
     )..where((t) => t.id.equals(id))).getSingleOrNull();
@@ -321,6 +419,11 @@ class QuizRepository {
             correctOptionIndex: row.correctOptionIndex,
             explanation: row.explanation,
             hint: row.hint,
+            type: QuizQuestionType.values.firstWhere(
+              (e) => e.name == row.type,
+              orElse: () => QuizQuestionType.single,
+            ),
+            correctIndices: row.correctIndices,
           ),
         )
         .toList();
@@ -336,6 +439,16 @@ class QuizRepository {
       createdAt: quizRow.createdAt,
     );
   }
+
+  Future<bool> isQuizCompleted(String quizId) async {
+    final userId = _authRepository.currentUser?.uid ?? '';
+    final result =
+        await (_db.select(_db.quizResults)
+              ..where((t) => t.userId.equals(userId) & t.quizId.equals(quizId))
+              ..limit(1))
+            .getSingleOrNull();
+    return result != null;
+  }
 }
 
 @Riverpod(keepAlive: true)
@@ -346,17 +459,22 @@ QuizRepository quizRepository(Ref ref) {
   return QuizRepository(geminiService, db, authRepository);
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<List<QuizResult>> recentQuizResults(Ref ref) {
   return ref.watch(quizRepositoryProvider).getRecentResults();
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<List<QuizResult>> allQuizResults(Ref ref) {
   return ref.watch(quizRepositoryProvider).getAllResults();
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<(QuizState, int)?> activeQuizProgress(Ref ref) {
   return ref.watch(quizRepositoryProvider).getQuizProgress();
+}
+
+@Riverpod(keepAlive: true)
+Future<List<QuizHistoryItem>> quizHistory(Ref ref) {
+  return ref.watch(quizRepositoryProvider).getQuizHistory();
 }

@@ -10,6 +10,8 @@ abstract class QuizQuestion with _$QuizQuestion {
     required String question,
     required List<String> options,
     required int correctOptionIndex,
+    @Default([]) List<int> correctIndices, // For multiple choice
+    @Default(QuizQuestionType.single) QuizQuestionType type,
     required String explanation,
     String? hint,
   }) = _QuizQuestion;
@@ -17,6 +19,8 @@ abstract class QuizQuestion with _$QuizQuestion {
   factory QuizQuestion.fromJson(Map<String, dynamic> json) =>
       _$QuizQuestionFromJson(json);
 }
+
+enum QuizQuestionType { single, multiple }
 
 @freezed
 abstract class Quiz with _$Quiz {

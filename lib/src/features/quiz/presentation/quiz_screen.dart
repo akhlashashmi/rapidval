@@ -119,13 +119,21 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
               child: ListView(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
+                  horizontal: 16,
                   vertical: 24,
                 ),
                 physics: const BouncingScrollPhysics(),
                 children: [
                   // Question Section
-                  _QuestionDisplay(question: question)
+                  _QuestionDisplay(
+                        question: question,
+                        onReport: () => _showReportDialog(
+                          context,
+                          question,
+                          quiz.id,
+                          quiz.title,
+                        ),
+                      )
                       .animate(key: ValueKey(currentIndex))
                       .fadeIn(duration: 400.ms)
                       .slideY(begin: 0.1, end: 0, curve: Curves.easeOutQuad),
@@ -134,7 +142,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
 
                   // Options Section
                   Text(
-                    'Select an answer:',
+                    question.type == QuizQuestionType.multiple
+                        ? 'Select all that apply:'
+                        : 'Select an answer:',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: Theme.of(
                         context,
@@ -146,8 +156,25 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
                   const SizedBox(height: 16),
 
                   ...List.generate(question.options.length, (index) {
-                    final isSelected = userAnswer?.selectedOptionIndex == index;
-                    final isCorrect = question.correctOptionIndex == index;
+                    bool isSelected = false;
+                    if (userAnswer != null) {
+                      if (userAnswer.selectedIndices.isNotEmpty) {
+                        isSelected = userAnswer.selectedIndices.contains(index);
+                      } else {
+                        isSelected = userAnswer.selectedOptionIndex == index;
+                      }
+                    }
+
+                    bool isCorrect = false;
+                    if (question.type == QuizQuestionType.multiple) {
+                      isCorrect = question.correctIndices.contains(index);
+                      if (question.correctIndices.isEmpty &&
+                          question.correctOptionIndex == index) {
+                        isCorrect = true;
+                      }
+                    } else {
+                      isCorrect = question.correctOptionIndex == index;
+                    }
 
                     // Interaction Logic
                     final VoidCallback? onTap = widget.isReviewMode
@@ -162,6 +189,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
                           text: question.options[index],
                           index: index,
                           isSelected: isSelected,
+                          isMultiple:
+                              question.type == QuizQuestionType.multiple,
                           // In review mode, show if it is correct OR if it was the user's wrong selection
                           isCorrectContext: widget.isReviewMode
                               ? isCorrect
@@ -258,6 +287,132 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
       const Scaffold(body: Center(child: Text("No Active Quiz")));
   Widget _buildErrorState() =>
       const Scaffold(body: Center(child: Text("Error loading results")));
+
+  void _showReportDialog(
+    BuildContext context,
+    QuizQuestion question,
+    String quizId,
+    String quizTitle,
+  ) {
+    final reasons = [
+      'Inappropriate content',
+      'Incorrect answer/question',
+      'Spam or misleading',
+      'Other',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Report Question'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: reasons
+              .map(
+                (reason) => ListTile(
+                  title: Text(reason),
+                  onTap: () {
+                    Navigator.pop(c);
+                    if (reason == 'Other') {
+                      _showOtherReasonDialog(
+                        context,
+                        question,
+                        quizId,
+                        quizTitle,
+                      );
+                    } else {
+                      _submitReport(
+                        question,
+                        reason,
+                        quizId,
+                        quizTitle: quizTitle,
+                      );
+                    }
+                  },
+                ),
+              )
+              .toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOtherReasonDialog(
+    BuildContext context,
+    QuizQuestion question,
+    String quizId,
+    String quizTitle,
+  ) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Report Details'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Please describe the issue...',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().isNotEmpty) {
+                Navigator.pop(c);
+                _submitReport(
+                  question,
+                  'Other',
+                  quizId,
+                  quizTitle: quizTitle,
+                  additionalComments: controller.text.trim(),
+                );
+              }
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _submitReport(
+    QuizQuestion question,
+    String reason,
+    String quizId, {
+    String? quizTitle,
+    String? additionalComments,
+  }) {
+    ref
+        .read(quizControllerProvider.notifier)
+        .reportQuestion(
+          questionId: question.id,
+          questionText: question.question,
+          options: question.options,
+          reportReason: reason,
+          quizId: quizId,
+          quizTitle: quizTitle,
+          additionalComments: additionalComments,
+        );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Report submitted. Thank you for your feedback.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 }
 
 // SUB-WIDGETS
@@ -403,8 +558,9 @@ class _QuizHeader extends StatelessWidget {
 
 class _QuestionDisplay extends StatelessWidget {
   final QuizQuestion question;
+  final VoidCallback onReport;
 
-  const _QuestionDisplay({required this.question});
+  const _QuestionDisplay({required this.question, required this.onReport});
 
   @override
   Widget build(BuildContext context) {
@@ -431,24 +587,38 @@ class _QuestionDisplay extends StatelessWidget {
                 ),
               ),
             ),
-            if (question.hint != null)
-              TextButton.icon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Hint: ${question.hint}'),
-                      behavior: SnackBarBehavior.floating,
+            Row(
+              children: [
+                if (question.hint != null)
+                  TextButton.icon(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Hint: ${question.hint}'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.lightbulb_outline, size: 16),
+                    label: const Text('Show Hint'),
+                    style: TextButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  );
-                },
-                icon: const Icon(Icons.lightbulb_outline, size: 16),
-                label: const Text('Show Hint'),
-                style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: onReport,
+                  icon: const Icon(Icons.flag_outlined, size: 18),
+                  tooltip: 'Report Question',
+                  style: IconButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                  ),
                 ),
-              ),
+              ],
+            ),
           ],
         ),
         const SizedBox(height: 16),
@@ -469,6 +639,7 @@ class _OptionTile extends StatelessWidget {
   final String text;
   final int index;
   final bool isSelected;
+  final bool isMultiple;
   final bool? isCorrectContext;
   final bool? isWrongContext;
   final VoidCallback? onTap;
@@ -477,6 +648,7 @@ class _OptionTile extends StatelessWidget {
     required this.text,
     required this.index,
     required this.isSelected,
+    this.isMultiple = false,
     this.isCorrectContext,
     this.isWrongContext,
     this.onTap,
@@ -546,7 +718,8 @@ class _OptionTile extends StatelessWidget {
                 height: 28,
                 decoration: BoxDecoration(
                   color: letterBg,
-                  shape: BoxShape.circle,
+                  shape: isMultiple ? BoxShape.rectangle : BoxShape.circle,
+                  borderRadius: isMultiple ? BorderRadius.circular(8) : null,
                 ),
                 alignment: Alignment.center,
                 child: isCorrectContext == true
@@ -650,21 +823,14 @@ class _BottomActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
         border: Border(
           top: BorderSide(
             color: Theme.of(
               context,
-            ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ).colorScheme.outlineVariant.withValues(alpha: 0.2),
           ),
         ),
       ),
@@ -746,7 +912,7 @@ class _BottomActionBar extends StatelessWidget {
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: const StadiumBorder(),
-                    elevation: isAnswered ? 2 : 0,
+                    elevation: 0,
                   ),
                   child: const Text(
                     'Next Question',

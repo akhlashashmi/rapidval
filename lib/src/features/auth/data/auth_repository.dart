@@ -193,8 +193,23 @@ class AuthRepository {
 
   Future<void> deleteAccount() async {
     debugPrint('AuthRepository: deleteAccount called');
+    final user = _auth.currentUser;
+    if (user == null) {
+      debugPrint('AuthRepository: No user logged in to delete');
+      throw Exception('No user logged in');
+    }
+
     try {
-      await _auth.currentUser?.delete();
+      // 1. Delete Firestore Data (Atomic Batch)
+      // We do this FIRST to ensure we don't leave orphaned data if account deletion succeeds but data deletion fails.
+      // If this fails, we abort and the account remains.
+      await _userRepository.deleteUserData(user.uid);
+
+      // 2. Delete Auth Account
+      // If this fails (e.g. requires recent login), the data is already gone.
+      // The user will need to re-authenticate and try again.
+      // Since deleteUserData is idempotent, retrying is safe.
+      await user.delete();
       debugPrint('AuthRepository: deleteAccount success');
     } catch (e) {
       debugPrint('AuthRepository: deleteAccount error: $e');

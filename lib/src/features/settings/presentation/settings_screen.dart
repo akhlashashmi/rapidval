@@ -5,7 +5,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:rapidval/src/core/theme/theme_controller.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../auth/data/auth_repository.dart';
+// import '../../dashboard/data/daily_quiz_repository.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -88,46 +90,54 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (context) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.info_outline,
-                size: 48,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'RapidVal',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Version 1.0.0',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '© 2025 RapidVal AI. All rights reserved.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => context.pop(),
-                  child: const Text('Close'),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
+          child: FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              final version = snapshot.data?.version ?? '...';
+              final buildNumber = snapshot.data?.buildNumber ?? '...';
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 48,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'RapidVal',
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Version $version ($buildNumber)',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    '© 2025 RapidVal AI. All rights reserved.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () => context.pop(),
+                      child: const Text('Close'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -697,6 +707,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onTap: () => context.push('/manage-topics'),
                     ),
                     _SettingsTile(
+                      icon: Icons.backup_outlined,
+                      title: 'Backups',
+                      subtitle: 'Manage your data backups',
+                      onTap: () => context.push('/backups'),
+                    ),
+                    _SettingsTile(
                       icon: Icons.brightness_6_outlined,
                       title: 'Theme',
                       subtitle: _getThemeModeName(
@@ -704,12 +720,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ),
                       onTap: () => _showThemeSelectionBottomSheet(context, ref),
                     ),
-                    _SettingsTile(
-                      icon: Icons.alarm_rounded,
-                      title: 'Reminders',
-                      subtitle: 'Daily study reminders',
-                      trailing: Switch(value: true, onChanged: (val) {}),
-                    ),
+                    // _SettingsTile(
+                    //   icon: Icons.alarm_rounded,
+                    //   title: 'Reminders',
+                    //   subtitle: 'Daily study reminders',
+                    //   trailing: Switch(value: true, onChanged: (val) {}),
+                    // ),
+                    // _SettingsTile(
+                    //   icon: Icons.refresh_rounded,
+                    //   title: 'Refresh Daily Quiz',
+                    //   subtitle: 'Generate a new daily challenge',
+                    //   onTap: () async {
+                    //     setState(() => _isLoading = true);
+                    //     try {
+                    //       await ref
+                    //           .read(dailyQuizRepositoryProvider)
+                    //           .refreshDailyQuiz();
+                    //       // Invalidate the provider to force a refresh on the dashboard
+                    //       ref.invalidate(dailyQuizProvider);
+                    //       if (context.mounted) {
+                    //         ScaffoldMessenger.of(context).showSnackBar(
+                    //           const SnackBar(
+                    //             content: Text('Daily quiz refreshed!'),
+                    //           ),
+                    //         );
+                    //       }
+                    //     } catch (e) {
+                    //       if (context.mounted) {
+                    //         ScaffoldMessenger.of(context).showSnackBar(
+                    //           SnackBar(content: Text('Failed to refresh: $e')),
+                    //         );
+                    //       }
+                    //     } finally {
+                    //       if (mounted) setState(() => _isLoading = false);
+                    //     }
+                    //   },
+                    // ),
                   ],
                 ),
 
@@ -736,7 +782,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       title: 'Privacy Policy',
                       subtitle: 'Read our privacy policy',
                       onTap: () {
-                        // TODO: Open Privacy Policy URL
+                        context.push('/privacy-policy');
                       },
                     ),
                     _SettingsTile(
@@ -744,20 +790,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       title: 'Terms of Service',
                       subtitle: 'Read our terms of service',
                       onTap: () {
-                        // TODO: Open Terms URL
+                        context.push('/terms-of-service');
                       },
                     ),
                   ],
-                ),
-
-                const SizedBox(height: 32),
-                Center(
-                  child: Text(
-                    'Version 1.0.0',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -795,11 +831,12 @@ class _SettingsGroup extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(24),
+        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
+          color: theme.colorScheme.primary.withValues(alpha: 0.12),
         ),
       ),
       child: Column(
@@ -827,7 +864,7 @@ class _SettingsTile extends StatelessWidget {
   final VoidCallback? onTap;
   final Color? titleColor;
   final Color? iconColor;
-  final Widget? trailing;
+  // final Widget? trailing;
   final bool showChevron;
 
   const _SettingsTile({
@@ -837,7 +874,7 @@ class _SettingsTile extends StatelessWidget {
     this.onTap,
     this.titleColor,
     this.iconColor,
-    this.trailing,
+    // this.trailing,
     this.showChevron = true,
   });
 
@@ -876,9 +913,10 @@ class _SettingsTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (trailing != null)
-              trailing!
-            else if (showChevron && onTap != null)
+            // if (trailing != null)
+            //   trailing!
+            // else if (showChevron && onTap != null)
+            if (showChevron && onTap != null)
               Icon(
                 Icons.chevron_right,
                 size: 20,

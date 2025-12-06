@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$QuizQuestion {
 
- String get id; String get question; List<String> get options; int get correctOptionIndex; String get explanation; String? get hint;
+ String get id; String get question; List<String> get options; int get correctOptionIndex; List<int> get correctIndices;// For multiple choice
+ QuizQuestionType get type; String get explanation; String? get hint;
 /// Create a copy of QuizQuestion
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -28,16 +29,16 @@ $QuizQuestionCopyWith<QuizQuestion> get copyWith => _$QuizQuestionCopyWithImpl<Q
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is QuizQuestion&&(identical(other.id, id) || other.id == id)&&(identical(other.question, question) || other.question == question)&&const DeepCollectionEquality().equals(other.options, options)&&(identical(other.correctOptionIndex, correctOptionIndex) || other.correctOptionIndex == correctOptionIndex)&&(identical(other.explanation, explanation) || other.explanation == explanation)&&(identical(other.hint, hint) || other.hint == hint));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is QuizQuestion&&(identical(other.id, id) || other.id == id)&&(identical(other.question, question) || other.question == question)&&const DeepCollectionEquality().equals(other.options, options)&&(identical(other.correctOptionIndex, correctOptionIndex) || other.correctOptionIndex == correctOptionIndex)&&const DeepCollectionEquality().equals(other.correctIndices, correctIndices)&&(identical(other.type, type) || other.type == type)&&(identical(other.explanation, explanation) || other.explanation == explanation)&&(identical(other.hint, hint) || other.hint == hint));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,question,const DeepCollectionEquality().hash(options),correctOptionIndex,explanation,hint);
+int get hashCode => Object.hash(runtimeType,id,question,const DeepCollectionEquality().hash(options),correctOptionIndex,const DeepCollectionEquality().hash(correctIndices),type,explanation,hint);
 
 @override
 String toString() {
-  return 'QuizQuestion(id: $id, question: $question, options: $options, correctOptionIndex: $correctOptionIndex, explanation: $explanation, hint: $hint)';
+  return 'QuizQuestion(id: $id, question: $question, options: $options, correctOptionIndex: $correctOptionIndex, correctIndices: $correctIndices, type: $type, explanation: $explanation, hint: $hint)';
 }
 
 
@@ -48,7 +49,7 @@ abstract mixin class $QuizQuestionCopyWith<$Res>  {
   factory $QuizQuestionCopyWith(QuizQuestion value, $Res Function(QuizQuestion) _then) = _$QuizQuestionCopyWithImpl;
 @useResult
 $Res call({
- String id, String question, List<String> options, int correctOptionIndex, String explanation, String? hint
+ String id, String question, List<String> options, int correctOptionIndex, List<int> correctIndices, QuizQuestionType type, String explanation, String? hint
 });
 
 
@@ -65,13 +66,15 @@ class _$QuizQuestionCopyWithImpl<$Res>
 
 /// Create a copy of QuizQuestion
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? question = null,Object? options = null,Object? correctOptionIndex = null,Object? explanation = null,Object? hint = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? question = null,Object? options = null,Object? correctOptionIndex = null,Object? correctIndices = null,Object? type = null,Object? explanation = null,Object? hint = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,question: null == question ? _self.question : question // ignore: cast_nullable_to_non_nullable
 as String,options: null == options ? _self.options : options // ignore: cast_nullable_to_non_nullable
 as List<String>,correctOptionIndex: null == correctOptionIndex ? _self.correctOptionIndex : correctOptionIndex // ignore: cast_nullable_to_non_nullable
-as int,explanation: null == explanation ? _self.explanation : explanation // ignore: cast_nullable_to_non_nullable
+as int,correctIndices: null == correctIndices ? _self.correctIndices : correctIndices // ignore: cast_nullable_to_non_nullable
+as List<int>,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as QuizQuestionType,explanation: null == explanation ? _self.explanation : explanation // ignore: cast_nullable_to_non_nullable
 as String,hint: freezed == hint ? _self.hint : hint // ignore: cast_nullable_to_non_nullable
 as String?,
   ));
@@ -158,10 +161,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String question,  List<String> options,  int correctOptionIndex,  String explanation,  String? hint)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String question,  List<String> options,  int correctOptionIndex,  List<int> correctIndices,  QuizQuestionType type,  String explanation,  String? hint)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _QuizQuestion() when $default != null:
-return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_that.explanation,_that.hint);case _:
+return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_that.correctIndices,_that.type,_that.explanation,_that.hint);case _:
   return orElse();
 
 }
@@ -179,10 +182,10 @@ return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String question,  List<String> options,  int correctOptionIndex,  String explanation,  String? hint)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String question,  List<String> options,  int correctOptionIndex,  List<int> correctIndices,  QuizQuestionType type,  String explanation,  String? hint)  $default,) {final _that = this;
 switch (_that) {
 case _QuizQuestion():
-return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_that.explanation,_that.hint);case _:
+return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_that.correctIndices,_that.type,_that.explanation,_that.hint);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +202,10 @@ return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String question,  List<String> options,  int correctOptionIndex,  String explanation,  String? hint)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String question,  List<String> options,  int correctOptionIndex,  List<int> correctIndices,  QuizQuestionType type,  String explanation,  String? hint)?  $default,) {final _that = this;
 switch (_that) {
 case _QuizQuestion() when $default != null:
-return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_that.explanation,_that.hint);case _:
+return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_that.correctIndices,_that.type,_that.explanation,_that.hint);case _:
   return null;
 
 }
@@ -214,7 +217,7 @@ return $default(_that.id,_that.question,_that.options,_that.correctOptionIndex,_
 @JsonSerializable()
 
 class _QuizQuestion implements QuizQuestion {
-  const _QuizQuestion({required this.id, required this.question, required final  List<String> options, required this.correctOptionIndex, required this.explanation, this.hint}): _options = options;
+  const _QuizQuestion({required this.id, required this.question, required final  List<String> options, required this.correctOptionIndex, final  List<int> correctIndices = const [], this.type = QuizQuestionType.single, required this.explanation, this.hint}): _options = options,_correctIndices = correctIndices;
   factory _QuizQuestion.fromJson(Map<String, dynamic> json) => _$QuizQuestionFromJson(json);
 
 @override final  String id;
@@ -227,6 +230,15 @@ class _QuizQuestion implements QuizQuestion {
 }
 
 @override final  int correctOptionIndex;
+ final  List<int> _correctIndices;
+@override@JsonKey() List<int> get correctIndices {
+  if (_correctIndices is EqualUnmodifiableListView) return _correctIndices;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_correctIndices);
+}
+
+// For multiple choice
+@override@JsonKey() final  QuizQuestionType type;
 @override final  String explanation;
 @override final  String? hint;
 
@@ -243,16 +255,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _QuizQuestion&&(identical(other.id, id) || other.id == id)&&(identical(other.question, question) || other.question == question)&&const DeepCollectionEquality().equals(other._options, _options)&&(identical(other.correctOptionIndex, correctOptionIndex) || other.correctOptionIndex == correctOptionIndex)&&(identical(other.explanation, explanation) || other.explanation == explanation)&&(identical(other.hint, hint) || other.hint == hint));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _QuizQuestion&&(identical(other.id, id) || other.id == id)&&(identical(other.question, question) || other.question == question)&&const DeepCollectionEquality().equals(other._options, _options)&&(identical(other.correctOptionIndex, correctOptionIndex) || other.correctOptionIndex == correctOptionIndex)&&const DeepCollectionEquality().equals(other._correctIndices, _correctIndices)&&(identical(other.type, type) || other.type == type)&&(identical(other.explanation, explanation) || other.explanation == explanation)&&(identical(other.hint, hint) || other.hint == hint));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,question,const DeepCollectionEquality().hash(_options),correctOptionIndex,explanation,hint);
+int get hashCode => Object.hash(runtimeType,id,question,const DeepCollectionEquality().hash(_options),correctOptionIndex,const DeepCollectionEquality().hash(_correctIndices),type,explanation,hint);
 
 @override
 String toString() {
-  return 'QuizQuestion(id: $id, question: $question, options: $options, correctOptionIndex: $correctOptionIndex, explanation: $explanation, hint: $hint)';
+  return 'QuizQuestion(id: $id, question: $question, options: $options, correctOptionIndex: $correctOptionIndex, correctIndices: $correctIndices, type: $type, explanation: $explanation, hint: $hint)';
 }
 
 
@@ -263,7 +275,7 @@ abstract mixin class _$QuizQuestionCopyWith<$Res> implements $QuizQuestionCopyWi
   factory _$QuizQuestionCopyWith(_QuizQuestion value, $Res Function(_QuizQuestion) _then) = __$QuizQuestionCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String question, List<String> options, int correctOptionIndex, String explanation, String? hint
+ String id, String question, List<String> options, int correctOptionIndex, List<int> correctIndices, QuizQuestionType type, String explanation, String? hint
 });
 
 
@@ -280,13 +292,15 @@ class __$QuizQuestionCopyWithImpl<$Res>
 
 /// Create a copy of QuizQuestion
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? question = null,Object? options = null,Object? correctOptionIndex = null,Object? explanation = null,Object? hint = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? question = null,Object? options = null,Object? correctOptionIndex = null,Object? correctIndices = null,Object? type = null,Object? explanation = null,Object? hint = freezed,}) {
   return _then(_QuizQuestion(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,question: null == question ? _self.question : question // ignore: cast_nullable_to_non_nullable
 as String,options: null == options ? _self._options : options // ignore: cast_nullable_to_non_nullable
 as List<String>,correctOptionIndex: null == correctOptionIndex ? _self.correctOptionIndex : correctOptionIndex // ignore: cast_nullable_to_non_nullable
-as int,explanation: null == explanation ? _self.explanation : explanation // ignore: cast_nullable_to_non_nullable
+as int,correctIndices: null == correctIndices ? _self._correctIndices : correctIndices // ignore: cast_nullable_to_non_nullable
+as List<int>,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
+as QuizQuestionType,explanation: null == explanation ? _self.explanation : explanation // ignore: cast_nullable_to_non_nullable
 as String,hint: freezed == hint ? _self.hint : hint // ignore: cast_nullable_to_non_nullable
 as String?,
   ));

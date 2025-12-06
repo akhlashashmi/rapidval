@@ -5,6 +5,8 @@ import '../domain/user_answer.dart';
 import 'quiz_state.dart';
 import '../data/quiz_repository.dart';
 
+import '../../auth/data/auth_repository.dart';
+
 part 'quiz_controller.g.dart';
 
 @Riverpod(keepAlive: true)
@@ -25,6 +27,34 @@ class QuizController extends _$QuizController {
       }
     });
     return null;
+  }
+
+  Future<void> reportQuestion({
+    required String questionId,
+    required String questionText,
+    required List<String> options,
+    required String reportReason,
+    String? quizId,
+    String? quizTitle,
+    String? additionalComments,
+  }) async {
+    final userId =
+        ref.read(authRepositoryProvider).currentUser?.uid ?? 'anonymous';
+    final finalQuizId = quizId ?? state?.quiz.id ?? 'unknown';
+    final finalQuizTitle = quizTitle ?? state?.quiz.title ?? 'Unknown Quiz';
+
+    await ref
+        .read(quizRepositoryProvider)
+        .reportQuestion(
+          quizId: finalQuizId,
+          quizTitle: finalQuizTitle,
+          questionId: questionId,
+          questionText: questionText,
+          options: options,
+          reportReason: reportReason,
+          userId: userId,
+          additionalComments: additionalComments,
+        );
   }
 
   Future<void> resumeQuiz() async {
@@ -84,11 +114,40 @@ class QuizController extends _$QuizController {
     if (state == null || state!.isCompleted) return;
 
     final currentIdx = state!.currentQuestionIndex;
+    final question = state!.quiz.questions[currentIdx];
+
+    // Get existing answer selection
+    final existingAnswer = getAnswerForQuestion(currentIdx);
+    List<int> currentSelected = [];
+
+    if (existingAnswer != null) {
+      if (existingAnswer.selectedIndices.isNotEmpty) {
+        currentSelected = List.from(existingAnswer.selectedIndices);
+      } else if (existingAnswer.selectedOptionIndex != -1) {
+        currentSelected = [existingAnswer.selectedOptionIndex];
+      }
+    }
+
+    List<int> newSelected = [];
+
+    if (question.type == QuizQuestionType.multiple) {
+      // Toggle logic
+      newSelected = List.from(currentSelected);
+      if (newSelected.contains(optionIndex)) {
+        newSelected.remove(optionIndex);
+      } else {
+        newSelected.add(optionIndex);
+      }
+    } else {
+      // Single choice logic (Replace)
+      newSelected = [optionIndex];
+    }
 
     // Create new UserAnswer object
     final newAnswer = UserAnswer(
       questionIndex: currentIdx,
-      selectedOptionIndex: optionIndex,
+      selectedOptionIndex: newSelected.isNotEmpty ? newSelected.first : -1,
+      selectedIndices: newSelected,
       answeredAt: DateTime.now(),
     );
 
@@ -159,13 +218,38 @@ class QuizController extends _$QuizController {
     int correctAnswers = 0;
     for (final answer in state!.userAnswers) {
       final question = state!.quiz.questions[answer.questionIndex];
-      if (answer.selectedOptionIndex == question.correctOptionIndex) {
-        correctAnswers++;
+
+      if (question.type == QuizQuestionType.multiple) {
+        // Multiple choice scoring
+        final selectedSet = answer.selectedIndices.toSet();
+        final correctSet = question.correctIndices.toSet();
+
+        // Fallback if correctIndices empty (legacy)
+        if (correctSet.isEmpty) {
+          correctSet.add(question.correctOptionIndex);
+        }
+
+        // Strict equality
+        if (selectedSet.length == correctSet.length &&
+            selectedSet.containsAll(correctSet)) {
+          correctAnswers++;
+        }
+      } else {
+        // Single choice scoring
+        final selected = answer.selectedIndices.isNotEmpty
+            ? answer.selectedIndices.first
+            : answer.selectedOptionIndex;
+
+        if (selected == question.correctOptionIndex) {
+          correctAnswers++;
+        }
       }
     }
 
     final totalQuestions = state!.quiz.questions.length;
-    final percentage = (correctAnswers / totalQuestions) * 100;
+    final percentage = totalQuestions > 0
+        ? (correctAnswers / totalQuestions) * 100
+        : 0.0;
 
     return QuizResult(
       quizId: state!.quiz.id,
