@@ -1,16 +1,17 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // For HapticFeedback
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../core/services/local_storage/hive_storage_service.dart';
+import '../../../core/widgets/app_button.dart';
 
 class OnboardingPageData {
   final String title;
-  final String highlight; // Part of the title to color differently
+  final String highlight;
   final String description;
   final IconData icon;
 
@@ -197,86 +198,41 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   const SizedBox(height: 32),
 
                   // THE BIG ACTION BUTTON
-                  SizedBox(
-                    width: double.infinity,
-                    height: 64,
-                    child:
-                        FilledButton(
-                              onPressed: _onNext,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: colorScheme.primary,
-                                foregroundColor: colorScheme.onPrimary,
-                                elevation: 10,
-                                shadowColor: colorScheme.primary.withOpacity(
-                                  0.4,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(50),
-                                ),
-                              ),
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 300),
-                                transitionBuilder: (child, anim) =>
-                                    FadeTransition(
-                                      opacity: anim,
-                                      child: SlideTransition(
-                                        position: Tween<Offset>(
-                                          begin: const Offset(0, 0.2),
-                                          end: Offset.zero,
-                                        ).animate(anim),
-                                        child: child,
-                                      ),
-                                    ),
-                                child: _currentPage == _pages.length - 1
-                                    ? Row(
-                                        key: const ValueKey('Start'),
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            'Get Started',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          const Icon(
-                                            FontAwesomeIcons.rocket,
-                                            size: 18,
-                                          ),
-                                        ],
-                                      )
-                                    : Row(
-                                        key: const ValueKey('Next'),
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            'Continue',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          const Icon(
-                                            FontAwesomeIcons.arrowRight,
-                                            size: 18,
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                            )
-                            .animate(
-                              target: _currentPage == _pages.length - 1 ? 1 : 0,
-                            )
-                            .shimmer(
-                              duration: 2000.ms,
-                              color: Colors.white24,
-                              delay: 500.ms,
-                            ),
-                  ),
+                  AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        transitionBuilder: (child, anim) => FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.2),
+                              end: Offset.zero,
+                            ).animate(anim),
+                            child: child,
+                          ),
+                        ),
+                        child: AppButton(
+                          key: ValueKey(_currentPage == _pages.length - 1),
+                          text: _currentPage == _pages.length - 1
+                              ? 'Get Started'
+                              : 'Continue',
+                          onPressed: _onNext,
+                          icon: Icon(
+                            _currentPage == _pages.length - 1
+                                ? FontAwesomeIcons.rocket
+                                : FontAwesomeIcons.arrowRight,
+                            size: 18,
+                          ),
+                          borderRadius: 50, // Keep pill shape for onboarding
+                        ),
+                      )
+                      .animate(
+                        target: _currentPage == _pages.length - 1 ? 1 : 0,
+                      )
+                      .shimmer(
+                        duration: 2000.ms,
+                        color: Colors.white24,
+                        delay: 500.ms,
+                      ),
                 ],
               ),
             ),

@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_outlined_button.dart';
 // import '../../dashboard/data/daily_quiz_repository.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -129,9 +131,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton(
+                    child: AppButton(
                       onPressed: () => context.pop(),
-                      child: const Text('Close'),
+                      text: 'Close',
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -222,20 +224,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: TextButton(
+                        child: AppOutlinedButton(
                           onPressed: () => context.pop(),
-                          child: const Text('Cancel'),
+                          text: 'Cancel',
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
-                        child: FilledButton(
+                        child: AppButton(
                           onPressed: () {
                             if (formKey.currentState!.validate()) {
                               context.pop(controller.text.trim());
                             }
                           },
-                          child: const Text('Save'),
+                          text: 'Save',
                         ),
                       ),
                     ],
@@ -305,18 +307,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  FilledButton(
+                  AppButton(
                     onPressed: () => context.pop(true),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: theme.colorScheme.error,
-                      foregroundColor: theme.colorScheme.onError,
-                    ),
-                    child: const Text('Delete Permanently'),
+                    backgroundColor: theme.colorScheme.error,
+                    foregroundColor: theme.colorScheme.onError,
+                    text: 'Delete Permanently',
                   ),
                   const SizedBox(height: 12),
-                  TextButton(
+                  AppOutlinedButton(
                     onPressed: () => context.pop(false),
-                    child: const Text('Cancel'),
+                    text: 'Cancel',
                   ),
                 ],
               ),
@@ -417,49 +417,64 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(dialogContext); // Close dialog
-                setState(() => _isLoading = true);
-                try {
-                  final email = FirebaseAuth.instance.currentUser?.email;
-                  if (email != null) {
-                    final credential = EmailAuthProvider.credential(
-                      email: email,
-                      password: passwordController.text,
-                    );
-                    await FirebaseAuth.instance.currentUser
-                        ?.reauthenticateWithCredential(credential);
-                    await ref.read(authRepositoryProvider).deleteAccount();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Account deleted successfully'),
-                        ),
-                      );
-                      context.go('/auth');
+          Row(
+            children: [
+              Expanded(
+                child: AppOutlinedButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  text: 'Cancel',
+                  height: 48,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: AppButton(
+                  height: 48,
+                  onPressed: () async {
+                    if (formKey.currentState!.validate()) {
+                      Navigator.pop(dialogContext); // Close dialog
+                      setState(() => _isLoading = true);
+                      try {
+                        final email = FirebaseAuth.instance.currentUser?.email;
+                        if (email != null) {
+                          final credential = EmailAuthProvider.credential(
+                            email: email,
+                            password: passwordController.text,
+                          );
+                          await FirebaseAuth.instance.currentUser
+                              ?.reauthenticateWithCredential(credential);
+                          await ref
+                              .read(authRepositoryProvider)
+                              .deleteAccount();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Account deleted successfully'),
+                              ),
+                            );
+                            context.go('/auth');
+                          }
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to delete account: $e'),
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.error,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _isLoading = false);
+                      }
                     }
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Failed to delete account: $e'),
-                        backgroundColor: Theme.of(context).colorScheme.error,
-                      ),
-                    );
-                  }
-                } finally {
-                  if (mounted) setState(() => _isLoading = false);
-                }
-              }
-            },
-            child: const Text('Confirm'),
+                  },
+                  text: 'Confirm',
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -502,29 +517,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(
+                child: AppButton(
                   onPressed: () async {
                     sheetContext.pop();
                     // Sign out first
                     await ref.read(authRepositoryProvider).signOut();
                     if (mounted) {
-                      // Navigate to auth screen with a flag or query param to indicate re-auth flow
-                      // For simplicity, we just go to auth, but ideally we'd want to auto-trigger the delete flow again
-                      // Since we can't easily pass state through a full auth flow redirect without more complex state management,
-                      // we will just guide the user to sign in again.
-                      // However, the user request says "get back to that same delete account process automatically".
-                      // This is complex because we lose state on sign out.
-                      // A workaround is to store a local flag (e.g. shared prefs) that we are in "delete mode".
-                      // But for now, let's just sign them out and let them sign back in.
-                      // The prompt says "make sure when you signout to reauthentice to delete account you get back to that same delete account process autmatically".
-                      // This implies we need to persist the intent.
-
-                      // Let's try to re-authenticate directly if possible using GoogleSignIn, but re-auth requires fresh sign-in.
-                      // We can't easily "return" to the delete process after a full sign-out/sign-in cycle without persisting state.
-
-                      // ALTERNATIVE: Don't sign out fully, just re-trigger the sign-in flow on top?
-                      // GoogleSignIn().signIn() can be called again.
-
                       try {
                         final user = await ref
                             .read(authRepositoryProvider)
@@ -554,13 +552,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       }
                     }
                   },
-                  child: const Text('Re-authenticate with Google'),
+                  text: 'Re-authenticate with Google',
                 ),
               ),
               const SizedBox(height: 12),
-              TextButton(
+              AppOutlinedButton(
                 onPressed: () => sheetContext.pop(),
-                child: const Text('Cancel'),
+                text: 'Cancel',
               ),
             ],
           ),
@@ -604,23 +602,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
+                    child: AppOutlinedButton(
                       onPressed: () => context.pop(false),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: theme.colorScheme.outline.withValues(
-                            alpha: 0.1,
-                          ),
-                        ),
-                      ),
-                      child: const Text('Cancel'),
+                      text: 'Cancel',
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: FilledButton(
+                    child: AppButton(
                       onPressed: () => context.pop(true),
-                      child: const Text('Sign Out'),
+                      text: 'Sign Out',
                     ),
                   ),
                 ],
@@ -676,12 +667,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       title: 'Email',
                       subtitle: user?.email ?? 'Not signed in',
                       showChevron: false,
-                    ),
-                    _SettingsTile(
-                      icon: Icons.logout,
-                      title: 'Sign Out',
-                      subtitle: 'Log out of your account',
-                      onTap: () => _showSignOutBottomSheet(context),
                     ),
                     _SettingsTile(
                       icon: Icons.delete_forever_outlined,
@@ -795,6 +780,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 24),
+                AppButton(
+                  text: 'Sign Out',
+                  icon: const Icon(Icons.logout_rounded, size: 20),
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  foregroundColor: colorScheme.onSurfaceVariant,
+                  onPressed: () => _showSignOutBottomSheet(context),
+                ),
+                const SizedBox(height: 32),
               ],
             ),
     );

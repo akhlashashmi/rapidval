@@ -4,6 +4,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../data/auth_repository.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_outlined_button.dart';
+import '../../../core/widgets/app_text_field.dart';
 
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -126,7 +129,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                   recognizer: TapGestureRecognizer()
                     ..onTap = () =>
-                        _launchUrl('https://rapidval.web.app/terms'),
+                        _launchUrl('https://rapidval.web.app/privacy.html'),
                 ),
                 const TextSpan(text: ' and '),
                 TextSpan(
@@ -134,7 +137,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold),
                   recognizer: TapGestureRecognizer()
                     ..onTap = () =>
-                        _launchUrl('https://rapidval.web.app/policy'),
+                        _launchUrl('https://rapidval.web.app/privacy.html'),
                 ),
                 const TextSpan(text: '.'),
               ],
@@ -178,35 +181,32 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     const SizedBox(height: 32),
 
                     if (!_isLogin)
-                      _SlickTextField(
+                      AppTextField(
                         controller: _nameController,
                         label: 'Full Name',
                         icon: Icons.person_outline_rounded,
-                        borderColor: dimmerBorderColor,
                         validator: (v) => v!.isEmpty ? 'Name required' : null,
                       ),
 
                     const SizedBox(height: 16),
 
-                    _SlickTextField(
+                    AppTextField(
                       controller: _emailController,
                       label: 'Email',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
-                      borderColor: dimmerBorderColor,
                       validator: (v) =>
                           !v!.contains('@') ? 'Invalid email' : null,
                     ),
 
                     const SizedBox(height: 16),
 
-                    _SlickTextField(
+                    AppTextField(
                       controller: _passwordController,
                       label: 'Password',
                       icon: Icons.lock_outline_rounded,
                       obscureText: !_isPasswordVisible,
-                      borderColor: dimmerBorderColor,
-                      isLast: true,
+                      textInputAction: TextInputAction.done,
                       onSubmit: _submit,
                       validator: (v) => v!.length < 6 ? 'Min 6 chars' : null,
                       suffix: IconButton(
@@ -224,27 +224,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
                     const SizedBox(height: 24),
 
-                    FilledButton(
-                      onPressed: _isLoading ? null : _submit,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 0,
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              _isLogin ? 'Sign In' : 'Sign Up',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                    AppButton(
+                      onPressed: _submit,
+                      isLoading: _isLoading,
+                      text: _isLogin ? 'Sign In' : 'Sign Up',
                     ),
 
                     const SizedBox(height: 24),
@@ -270,24 +253,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     const SizedBox(height: 24),
 
                     // Google Button - Using the darker border color
-                    OutlinedButton.icon(
+                    AppOutlinedButton(
                       onPressed: _isLoading ? null : _signInWithGoogle,
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        side: BorderSide(color: dimmerBorderColor),
-                      ),
                       icon: SvgPicture.asset(
                         'assets/images/google_icon.svg',
                         height: 20,
                         width: 20,
                       ),
-                      label: Text(
-                        'Continue with Google',
-                        style: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
+                      text: 'Continue with Google',
                     ),
 
                     const SizedBox(height: 24),
@@ -323,76 +296,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SlickTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final IconData icon;
-  final Color borderColor;
-  final bool obscureText;
-  final bool isLast;
-  final Widget? suffix;
-  final TextInputType? keyboardType;
-  final String? Function(String?)? validator;
-  final VoidCallback? onSubmit;
-
-  const _SlickTextField({
-    required this.controller,
-    required this.label,
-    required this.icon,
-    required this.borderColor,
-    this.obscureText = false,
-    this.isLast = false,
-    this.suffix,
-    this.keyboardType,
-    this.validator,
-    this.onSubmit,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      textInputAction: isLast ? TextInputAction.done : TextInputAction.next,
-      onFieldSubmitted: (_) => onSubmit?.call(),
-      validator: validator,
-      style: const TextStyle(fontSize: 15),
-      decoration: InputDecoration(
-        labelText: label,
-        floatingLabelBehavior: FloatingLabelBehavior.auto,
-        prefixIcon: Icon(icon, size: 20),
-        suffixIcon: suffix,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
-        // Base border definition
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        // The border when the field is not focused
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        // The border when focused (keeps primary color)
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: theme.colorScheme.error),
         ),
       ),
     );

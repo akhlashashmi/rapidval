@@ -166,7 +166,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         'Dashboard',
         style: TextStyle(
           fontSize: 24,
-          fontWeight: FontWeight.w900,
           color: colorScheme.onSurface,
           letterSpacing: -0.5,
           height: 1.2,
@@ -183,11 +182,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           const SizedBox(width: 8),
           Text(
             '${selectionState.length} Selected',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
+            style: TextStyle(fontSize: 20, color: colorScheme.onSurface),
           ),
         ],
       );
@@ -216,7 +211,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           'Quiz History',
                           style: TextStyle(
                             fontSize: 24,
-                            fontWeight: FontWeight.w900,
                             color: colorScheme.onSurface,
                             letterSpacing: -0.5,
                             height: 1.2,

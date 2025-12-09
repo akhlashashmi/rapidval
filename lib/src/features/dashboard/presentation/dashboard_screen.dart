@@ -78,6 +78,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         dailyQuizAsync.when(
                           data: (quiz) {
                             if (quiz == null) return const SizedBox.shrink();
+
+                            // Check if the daily quiz is already active (in "Continue Learning")
+                            final activeState =
+                                activeQuizProgressAsync.value?.$1;
+                            if (activeState != null &&
+                                activeState.quiz.id == quiz.id) {
+                              return const SizedBox.shrink();
+                            }
+
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -282,7 +291,7 @@ class _StatsRow extends StatelessWidget {
             label: 'Completed',
             value: stats.totalQuizzes.toString(),
             icon: Icons.check_circle_outline_rounded,
-            color: Theme.of(context).colorScheme.secondary,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         const SizedBox(width: 16),
@@ -291,7 +300,7 @@ class _StatsRow extends StatelessWidget {
             label: 'Avg. Score',
             value: '${stats.averageScore}%',
             icon: Icons.bar_chart_rounded,
-            color: Theme.of(context).colorScheme.tertiary,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
       ],

@@ -9,14 +9,16 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_outlined_button.dart';
 import '../domain/quiz_entity.dart';
 import '../domain/user_answer.dart';
-import 'quiz_screen.dart';
 
 class ResultsScreen extends StatefulWidget {
   final QuizResult quizResult;
+  final String? returnPath;
 
-  const ResultsScreen({super.key, required this.quizResult});
+  const ResultsScreen({super.key, required this.quizResult, this.returnPath});
 
   @override
   State<ResultsScreen> createState() => _ResultsScreenState();
@@ -26,6 +28,7 @@ class _ResultsScreenState extends State<ResultsScreen> {
   final GlobalKey _globalKey = GlobalKey();
 
   Future<void> _captureAndSharePng() async {
+    // ... (rest of the method unchanged)
     try {
       // Find the render boundary
       final boundary =
@@ -97,7 +100,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
         leading: Padding(
           padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
           child: IconButton(
-            onPressed: () => context.pop(),
+            onPressed: () {
+              if (widget.returnPath != null) {
+                context.go(widget.returnPath!);
+              } else {
+                context.go('/dashboard');
+              }
+            },
             icon: const Icon(Icons.close, size: 20),
             style: IconButton.styleFrom(
               backgroundColor: colorScheme.surface.withValues(alpha: 0.8),
@@ -277,14 +286,13 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   ),
                   _ActionDock(
                         onReview: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => QuizScreen(
-                                isReviewMode: true,
-                                quizResult: result,
-                              ),
-                            ),
+                          context.push(
+                            '/quiz',
+                            extra: {
+                              'quizResult': result,
+                              'isReviewMode': true,
+                              'returnPath': widget.returnPath,
+                            },
                           );
                         },
                         onRetake: () =>
@@ -762,29 +770,18 @@ class _ActionDock extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: FilledButton.tonalIcon(
+            child: AppOutlinedButton(
               onPressed: onReview,
-              icon: const Icon(Icons.visibility_outlined),
-              label: const Text('Review Answers'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: const StadiumBorder(),
-              ),
+              text: 'Review',
+              icon: const Icon(Icons.visibility_outlined, size: 20),
             ),
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: FilledButton.icon(
+            child: AppButton(
               onPressed: onRetake,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retake Quiz'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: const StadiumBorder(),
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-                elevation: 0,
-              ),
+              text: 'Retake',
+              icon: const Icon(Icons.refresh_rounded, size: 20),
             ),
           ),
         ],

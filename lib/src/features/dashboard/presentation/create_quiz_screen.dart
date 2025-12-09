@@ -10,6 +10,7 @@ import 'dashboard_controller.dart';
 import '../../quiz/data/quiz_repository.dart';
 import '../../quiz/domain/quiz_entity.dart';
 import '../../quiz/presentation/quiz_controller.dart';
+import '../../../core/widgets/app_button.dart';
 
 class CreateQuizScreen extends ConsumerStatefulWidget {
   final Quiz? existingQuiz;
@@ -87,7 +88,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
             .read(quizControllerProvider.notifier)
             .startQuiz(quiz, config.timePerQuestionSeconds);
         // Replace current screen with quiz
-        context.pushReplacement('/quiz');
+        context.pushReplacement('/quiz', extra: {'returnPath': '/dashboard'});
       } catch (e) {
         log('Error starting existing quiz: $e');
         if (mounted) {
@@ -119,7 +120,10 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                   .read(quizControllerProvider.notifier)
                   .startQuiz(event.$2!, config.timePerQuestionSeconds);
               // Replace current screen with quiz
-              context.pushReplacement('/quiz');
+              context.pushReplacement(
+                '/quiz',
+                extra: {'returnPath': '/dashboard'},
+              );
             }
           },
           onError: (e) {
@@ -374,32 +378,16 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                           ),
                         ),
                         child: SafeArea(
-                          child: FilledButton(
+                          child: AppButton(
                             onPressed: _isLoading || config.topic.isEmpty
                                 ? null
                                 : _startQuiz,
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: const StadiumBorder(),
-                              elevation: 0,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  isRetake
-                                      ? Icons.refresh_rounded
-                                      : Icons.auto_awesome_rounded,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  isRetake ? 'Retake Quiz' : 'Generate Quiz',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
+                            text: isRetake ? 'Retake Quiz' : 'Generate Quiz',
+                            icon: Icon(
+                              isRetake
+                                  ? Icons.refresh_rounded
+                                  : Icons.auto_awesome_rounded,
+                              size: 20,
                             ),
                           ),
                         ),

@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../auth/data/user_repository.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/user_controller.dart';
+import '../../../core/widgets/app_button.dart';
 
 class CategorySelectionScreen extends ConsumerStatefulWidget {
   final bool isSettingsMode;
@@ -169,10 +170,7 @@ class _CategorySelectionScreenState
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text(
-          widget.isSettingsMode ? 'Manage Topics' : 'Your Interests',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-        ),
+        title: Text(widget.isSettingsMode ? 'Manage Topics' : 'Your Interests'),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -370,29 +368,10 @@ class _CategorySelectionScreenState
               ),
               const SizedBox(height: 24),
 
-              FilledButton(
-                onPressed: _isLoading ? null : _submit,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: const StadiumBorder(),
-                  elevation: 0,
-                ),
-                child: _isLoading
-                    ? SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: colorScheme.onPrimary,
-                        ),
-                      )
-                    : Text(
-                        widget.isSettingsMode ? 'Save Changes' : 'Continue',
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+              AppButton(
+                onPressed: _submit,
+                isLoading: _isLoading,
+                text: widget.isSettingsMode ? 'Save Changes' : 'Continue',
               ),
             ],
           ),

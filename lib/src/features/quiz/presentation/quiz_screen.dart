@@ -6,12 +6,20 @@ import 'package:go_router/go_router.dart';
 import '../domain/user_answer.dart';
 import '../domain/quiz_entity.dart';
 import 'quiz_controller.dart';
+import '../../../core/widgets/app_button.dart';
+import '../../../core/widgets/app_outlined_button.dart';
 
 class QuizScreen extends ConsumerStatefulWidget {
   final bool isReviewMode;
   final QuizResult? quizResult;
+  final String? returnPath;
 
-  const QuizScreen({super.key, this.isReviewMode = false, this.quizResult});
+  const QuizScreen({
+    super.key,
+    this.isReviewMode = false,
+    this.quizResult,
+    this.returnPath,
+  });
 
   @override
   ConsumerState<QuizScreen> createState() => _QuizScreenState();
@@ -251,7 +259,10 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
     final result = ref.read(quizControllerProvider.notifier).getQuizResult();
     if (result != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.pushReplacement('/results', extra: result);
+        context.pushReplacement(
+          '/results',
+          extra: {'result': result, 'returnPath': widget.returnPath},
+        );
       });
     }
   }
@@ -273,7 +284,11 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
             TextButton(
               onPressed: () {
                 Navigator.pop(c);
-                context.go('/dashboard');
+                if (widget.returnPath != null) {
+                  context.go(widget.returnPath!);
+                } else {
+                  context.go('/dashboard');
+                }
               },
               child: const Text('Exit'),
             ),
@@ -367,7 +382,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
             onPressed: () => Navigator.pop(c),
             child: const Text('Cancel'),
           ),
-          FilledButton(
+          AppButton(
+            text: 'Submit',
+            height: 48, // Slightly smaller for dialog
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
                 Navigator.pop(c);
@@ -380,7 +397,6 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
                 );
               }
             },
-            child: const Text('Submit'),
           ),
         ],
       ),
@@ -851,21 +867,10 @@ class _BottomActionBar extends StatelessWidget {
                           physics: const NeverScrollableScrollPhysics(),
                           child: SizedBox(
                             width: halfWidth,
-                            child: OutlinedButton.icon(
+                            child: AppOutlinedButton(
                               onPressed: onPrevious,
                               icon: const Icon(Icons.arrow_back),
-                              label: const Text('Previous'),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                                side: BorderSide(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.outline.withValues(alpha: 0.2),
-                                ),
-                                shape: const StadiumBorder(),
-                              ),
+                              text: 'Previous',
                             ),
                           ),
                         ),

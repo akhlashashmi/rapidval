@@ -23,6 +23,8 @@ import '../../features/backup/presentation/backup_screen.dart';
 import '../../features/settings/presentation/legal/privacy_policy_screen.dart';
 import '../../features/settings/presentation/legal/terms_of_service_screen.dart';
 
+import '../../features/onboarding/presentation/splash_screen.dart';
+
 part 'app_router.g.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -34,9 +36,18 @@ GoRouter goRouter(Ref ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/auth',
+    initialLocation: '/splash',
     redirect: (context, state) {
+      // 1. Loading State: Stay on /splash until we have definitive state
+      if (authState.isLoading ||
+          (authState.hasValue &&
+              authState.value != null &&
+              userProfileAsync.isLoading)) {
+        return '/splash';
+      }
+
       final isLoggedIn = authState.value != null;
+      final isSplashRoute = state.uri.path == '/splash';
       final isAuthRoute = state.uri.path == '/auth';
       final isOnboardingRoute = state.uri.path == '/onboarding';
       final isVerifyEmailRoute = state.uri.path == '/verify-email';
@@ -46,7 +57,8 @@ GoRouter goRouter(Ref ref) {
           .read(localStorageServiceProvider)
           .get('settings', 'onboarding_seen', defaultValue: false);
 
-      if (!onboardingSeen && !isOnboardingRoute) {
+      if (!onboardingSeen && !isLoggedIn) {
+        if (isOnboardingRoute) return null;
         return '/onboarding';
       }
 
@@ -55,6 +67,7 @@ GoRouter goRouter(Ref ref) {
       }
 
       if (!isLoggedIn) {
+        if (isSplashRoute) return '/auth';
         return (isAuthRoute || isOnboardingRoute) ? null : '/auth';
       }
 
@@ -91,13 +104,17 @@ GoRouter goRouter(Ref ref) {
           return '/dashboard';
         }
 
-        if (isAuthRoute || isOnboardingRoute) {
+        if (isAuthRoute || isOnboardingRoute || isSplashRoute) {
           return '/dashboard';
         }
       }
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),
       GoRoute(
         path: '/verify-email',
@@ -133,12 +150,45 @@ GoRouter goRouter(Ref ref) {
         ],
       ),
 
-      GoRoute(path: '/quiz', builder: (context, state) => const QuizScreen()),
+      GoRoute(
+        path: '/quiz',
+        builder: (context, state) {
+          String? returnPath;
+          bool isReviewMode = false;
+          QuizResult? quizResult;
+
+          if (state.extra is Map<String, dynamic>) {
+            final map = state.extra as Map<String, dynamic>;
+            returnPath = map['returnPath'] as String?;
+            isReviewMode = map['isReviewMode'] as bool? ?? false;
+            quizResult = map['quizResult'] as QuizResult?;
+          }
+
+          return QuizScreen(
+            returnPath: returnPath,
+            isReviewMode: isReviewMode,
+            quizResult: quizResult,
+          );
+        },
+      ),
       GoRoute(
         path: '/results',
         builder: (context, state) {
-          final result = state.extra as QuizResult;
-          return ResultsScreen(quizResult: result);
+          QuizResult result;
+          String? returnPath;
+
+          final extra = state.extra;
+          if (extra is QuizResult) {
+            result = extra;
+          } else if (extra is Map<String, dynamic>) {
+            result = extra['result'] as QuizResult;
+            returnPath = extra['returnPath'] as String?;
+          } else {
+            // Should not happen if strictly typed, but good to fallback or error
+            throw Exception('Invalid argument for /results');
+          }
+
+          return ResultsScreen(quizResult: result, returnPath: returnPath);
         },
       ),
       GoRoute(

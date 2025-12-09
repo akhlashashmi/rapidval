@@ -190,7 +190,10 @@ class _HistoryCard extends ConsumerWidget {
               ref.read(historySelectionProvider.notifier).toggle(item.quiz.id);
             } else {
               if (isCompleted) {
-                context.push('/results', extra: item.result);
+                context.push(
+                  '/results',
+                  extra: {'result': item.result, 'returnPath': '/history'},
+                );
               } else {
                 // Pending/Not Attempted: Start the quiz
                 final dashboardConfig = ref
@@ -202,7 +205,7 @@ class _HistoryCard extends ConsumerWidget {
                 ref
                     .read(quizControllerProvider.notifier)
                     .startQuiz(item.quiz, timePerQuestion);
-                context.push('/quiz');
+                context.push('/quiz', extra: {'returnPath': '/history'});
               }
             }
           },
