@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'backup_controller.dart';
 import '../domain/backup_snapshot.dart';
+
+const double _cardHeight = 360.0;
 
 class BackupScreen extends ConsumerWidget {
   const BackupScreen({super.key});
@@ -43,26 +46,29 @@ class BackupScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             children: [
               _SectionHeader(title: 'Cloud Backup'),
-              backupAsync.when(
-                data: (backup) {
-                  if (backup == null) {
-                    return _NoBackupCard(
-                      onCreate: () {
-                        ref
-                            .read(backupControllerProvider.notifier)
-                            .createBackup();
-                      },
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: backupAsync.when(
+                  data: (backup) {
+                    if (backup == null) {
+                      return _NoBackupCard(
+                        onCreate: () {
+                          ref
+                              .read(backupControllerProvider.notifier)
+                              .createBackup();
+                        },
+                      );
+                    }
+                    return _BackupStatusCard(
+                      backup: backup,
+                      onOverwrite: () => _showOverwriteDialog(context, ref),
+                      onRestore: () => _showRestoreDialog(context, ref),
+                      onDelete: () => _showDeleteDialog(context, ref),
                     );
-                  }
-                  return _BackupStatusCard(
-                    backup: backup,
-                    onOverwrite: () => _showOverwriteDialog(context, ref),
-                    onRestore: () => _showRestoreDialog(context, ref),
-                    onDelete: () => _showDeleteDialog(context, ref),
-                  );
-                },
-                loading: () => const _LoadingCard(),
-                error: (err, stack) => _ErrorCard(error: err.toString()),
+                  },
+                  loading: () => const _ShimmerCard(),
+                  error: (err, stack) => _ErrorCard(error: err.toString()),
+                ),
               ),
               const SizedBox(height: 24),
               _SectionHeader(title: 'Information'),
@@ -71,15 +77,13 @@ class BackupScreen extends ConsumerWidget {
                   _SettingsTile(
                     icon: Icons.info_outline,
                     title: 'About Backups',
-                    subtitle:
-                        'Your data is securely stored in the cloud. You can only have one backup at a time.',
+                    subtitle: 'Your data is securely stored in the cloud.',
                     showChevron: false,
                   ),
                   _SettingsTile(
                     icon: Icons.security,
                     title: 'Data Privacy',
-                    subtitle:
-                        'Only you can access your backup. It is linked to your account.',
+                    subtitle: 'Only you can access your backup.',
                     showChevron: false,
                   ),
                 ],
@@ -214,10 +218,12 @@ class _SettingsGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.05)),
       ),
       child: Column(children: children),
     );
@@ -285,21 +291,30 @@ class _NoBackupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Container(
+      height: _cardHeight,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
-        ),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.cloud_off_rounded,
-            size: 64,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.cloud_off_rounded,
+              size: 48,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -313,10 +328,10 @@ class _NoBackupCard extends StatelessWidget {
             'Create a backup to secure your quiz history and preferences.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
@@ -347,32 +362,41 @@ class _BackupStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final dateStr = DateFormat.yMMMd().add_jm().format(backup.createdAt);
 
     return Container(
+      height: _cardHeight,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+        color: colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: theme.colorScheme.primary.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.12)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                  color: colorScheme
+                      .primary, // Solid color for icon bg like dashboard play button
                   shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Icon(
                   Icons.cloud_done_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 32,
+                  color: colorScheme.onPrimary,
+                  size: 28, // Dashboard uses 28
                 ),
               ),
               const SizedBox(width: 16),
@@ -381,16 +405,21 @@ class _BackupStatusCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Last Backup',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.primary,
+                      'CLOUD BACKUP',
+                      style: TextStyle(
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        color: colorScheme.primary,
                       ),
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       dateStr,
-                      style: theme.textTheme.titleMedium?.copyWith(
+                      style: const TextStyle(
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        height: 1.2,
                       ),
                     ),
                   ],
@@ -398,7 +427,7 @@ class _BackupStatusCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -419,9 +448,9 @@ class _BackupStatusCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          const Divider(),
           const SizedBox(height: 16),
+          Divider(color: colorScheme.outline.withValues(alpha: 0.1)),
+          const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -429,19 +458,19 @@ class _BackupStatusCard extends StatelessWidget {
                 icon: Icons.cloud_upload_rounded,
                 label: 'Overwrite',
                 onTap: onOverwrite,
-                color: theme.colorScheme.primary,
+                color: colorScheme.primary,
               ),
               _CompactActionButton(
                 icon: Icons.cloud_download_rounded,
                 label: 'Restore',
                 onTap: onRestore,
-                color: theme.colorScheme.secondary,
+                color: colorScheme.secondary,
               ),
               _CompactActionButton(
                 icon: Icons.delete_outline_rounded,
                 label: 'Delete',
                 onTap: onDelete,
-                color: theme.colorScheme.error,
+                color: colorScheme.error,
                 isDestructive: true,
               ),
             ],
@@ -476,12 +505,13 @@ class _CompactActionButton extends StatelessWidget {
           onPressed: onTap,
           icon: Icon(icon),
           style: IconButton.styleFrom(
-            backgroundColor: isDestructive
-                ? color.withValues(alpha: 0.1)
-                : color.withValues(alpha: 0.1),
+            backgroundColor: color.withValues(alpha: 0.1),
             foregroundColor: color,
             padding: const EdgeInsets.all(16),
-            iconSize: 28,
+            iconSize: 24,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ), // Softer shape
           ),
         ),
         const SizedBox(height: 8),
@@ -512,25 +542,23 @@ class _StatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Column(
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-        ),
+        Icon(icon, size: 20, color: colorScheme.primary.withValues(alpha: 0.7)),
         const SizedBox(height: 4),
         Text(
           value,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
+            color: colorScheme.onSurface,
           ),
         ),
         Text(
           label,
           style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       ],
@@ -538,20 +566,125 @@ class _StatItem extends StatelessWidget {
   }
 }
 
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard();
+class _ShimmerCard extends StatelessWidget {
+  const _ShimmerCard();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    // Helper to create placeholder lines
+    Widget placeholderBox({
+      double width = double.infinity,
+      double height = 16,
+      double radius = 8,
+    }) {
+      return Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: colorScheme.onSurface.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      );
+    }
+
     return Container(
-      height: 200,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: const Center(child: CircularProgressIndicator()),
-    );
+          height: _cardHeight,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: colorScheme.outline.withValues(alpha: 0.05),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Header Shimmer
+              Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        placeholderBox(width: 80, height: 12),
+                        const SizedBox(height: 8),
+                        placeholderBox(width: 140, height: 20),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Stats Shimmer
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: List.generate(
+                  3,
+                  (index) => Column(
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      placeholderBox(width: 30, height: 16),
+                      const SizedBox(height: 4),
+                      placeholderBox(width: 40, height: 10),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Divider(color: colorScheme.outline.withValues(alpha: 0.05)),
+              const SizedBox(height: 8),
+              // Actions Shimmer
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(
+                  3,
+                  (index) => Column(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      placeholderBox(width: 40, height: 12),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        )
+        .animate(onPlay: (controller) => controller.repeat())
+        .shimmer(
+          duration: 1500.ms,
+          color: colorScheme.surface.withValues(alpha: 0.6),
+          blendMode: BlendMode.srcOver,
+        );
   }
 }
 
@@ -566,10 +699,10 @@ class _ErrorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer.withValues(alpha: 0.2),
+        color: theme.colorScheme.errorContainer.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: theme.colorScheme.error.withValues(alpha: 0.5),
+          color: theme.colorScheme.error.withValues(alpha: 0.2),
         ),
       ),
       child: Column(

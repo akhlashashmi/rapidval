@@ -8,6 +8,9 @@ import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_outlined_button.dart';
 import '../../../core/widgets/app_text_field.dart';
 
+import 'dart:developer';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -25,8 +28,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _passwordController = TextEditingController();
 
   bool _isLogin = true;
-  bool _isLoading = false;
+  bool _isEmailLoading = false;
+  bool _isGoogleLoading = false;
   bool _isPasswordVisible = false;
+
+  bool get _anyLoading => _isEmailLoading || _isGoogleLoading;
 
   @override
   void dispose() {
@@ -37,6 +43,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   void _toggleAuthMode() {
+    if (_anyLoading) return;
     setState(() {
       _isLogin = !_isLogin;
       _formKey.currentState?.reset();
@@ -45,7 +52,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
+    setState(() => _isEmailLoading = true);
     FocusManager.instance.primaryFocus?.unfocus();
 
     try {
@@ -65,22 +72,76 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               _nameController.text.trim(),
             );
       }
-    } catch (e) {
-      if (mounted) _showSnack(e.toString(), isError: true);
+    } catch (e, stackTrace) {
+      if (mounted) _handleError(e, stackTrace);
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isEmailLoading = false);
     }
   }
 
   Future<void> _signInWithGoogle() async {
-    setState(() => _isLoading = true);
+    setState(() => _isGoogleLoading = true);
     try {
       await ref.read(authRepositoryProvider).signInWithGoogle();
-    } catch (e) {
-      if (mounted) _showSnack(e.toString(), isError: true);
+    } catch (e, stackTrace) {
+      if (mounted) _handleError(e, stackTrace);
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
+  }
+
+  void _handleError(Object error, StackTrace stackTrace) {
+    // For Developer: Detailed log
+    log('Auth Error', error: error, stackTrace: stackTrace, name: 'AuthScreen');
+
+    // For User: Friendly message
+    String message = 'An unexpected error occurred. Please try again.';
+
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'user-not-found':
+        case 'wrong-password':
+        case 'invalid-credential':
+          message = 'Invalid email or password.';
+          break;
+        case 'email-already-in-use':
+          message = 'This email is already associated with another account.';
+          break;
+        case 'weak-password':
+          message = 'The password must be at least 6 characters.';
+          break;
+        case 'invalid-email':
+          message = 'Please enter a valid email address.';
+          break;
+        case 'network-request-failed':
+          message = 'Network error. Please check your internet connection.';
+          break;
+        case 'too-many-requests':
+          message = 'Too many attempts. Please try again later.';
+          break;
+        case 'user-disabled':
+          message = 'This account has been disabled. Please contact support.';
+          break;
+        case 'operation-not-allowed':
+          message = 'This sign-in method is currently unavailable.';
+          break;
+        case 'account-exists-with-different-credential':
+          message =
+              'An account already exists with the same email address but different sign-in credentials.';
+          break;
+        default:
+          // Use the message from Firebase if it's somewhat readable, otherwise generic
+          if (error.message != null && error.message!.isNotEmpty) {
+            message = error.message!;
+          }
+      }
+    } else {
+      // Fallback for non-Firebase errors
+      final errStr = error.toString().replaceAll('Exception: ', '');
+      if (errStr.isNotEmpty) message = errStr;
+    }
+
+    _showSnack(message, isError: true);
   }
 
   void _showSnack(String msg, {bool isError = false}) {
@@ -185,6 +246,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         controller: _nameController,
                         label: 'Full Name',
                         icon: Icons.person_outline_rounded,
+                        enabled: !_anyLoading,
                         validator: (v) => v!.isEmpty ? 'Name required' : null,
                       ),
 
@@ -195,6 +257,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       label: 'Email',
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
+                      enabled: !_anyLoading,
                       validator: (v) =>
                           !v!.contains('@') ? 'Invalid email' : null,
                     ),
@@ -207,7 +270,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       icon: Icons.lock_outline_rounded,
                       obscureText: !_isPasswordVisible,
                       textInputAction: TextInputAction.done,
-                      onSubmit: _submit,
+                      enabled: !_anyLoading,
+                      onSubmit: _anyLoading ? null : _submit,
                       validator: (v) => v!.length < 6 ? 'Min 6 chars' : null,
                       suffix: IconButton(
                         icon: Icon(
@@ -225,8 +289,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     const SizedBox(height: 24),
 
                     AppButton(
-                      onPressed: _submit,
-                      isLoading: _isLoading,
+                      onPressed: _anyLoading ? null : _submit,
+                      isLoading: _isEmailLoading,
                       text: _isLogin ? 'Sign In' : 'Sign Up',
                     ),
 
@@ -240,7 +304,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           child: Text(
                             'OR',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 12, // Reduced font size
                               color: colorScheme.onSurfaceVariant,
                               fontWeight: FontWeight.bold,
                             ),
@@ -254,7 +318,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
                     // Google Button - Using the darker border color
                     AppOutlinedButton(
-                      onPressed: _isLoading ? null : _signInWithGoogle,
+                      onPressed: _anyLoading ? null : _signInWithGoogle,
+                      isLoading: _isGoogleLoading,
                       icon: SvgPicture.asset(
                         'assets/images/google_icon.svg',
                         height: 20,

@@ -6,13 +6,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../quiz/data/quiz_repository.dart';
 import '../../quiz/domain/user_answer.dart';
 import '../../quiz/domain/quiz_history_item.dart';
-import '../../quiz/presentation/quiz_controller.dart'; // For startQuiz
-import '../../dashboard/presentation/dashboard_controller.dart'; // For timePerQuestion
 
 import 'history_filter_provider.dart';
 
 import 'history_selection_provider.dart';
 import 'widgets/history_shimmer.dart';
+
+import 'history_controller.dart';
 
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
@@ -24,125 +24,161 @@ class HistoryScreen extends ConsumerStatefulWidget {
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
-    // Changed to quizHistoryProvider
-    final historyAsync = ref.watch(quizHistoryProvider);
+    // Use historyControllerProvider for paginated + streaming data
+    final historyAsync = ref.watch(historyControllerProvider);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final filterState = ref.watch(historyFilterProvider);
     final selectionState = ref.watch(historySelectionProvider);
     final isSelectionMode = selectionState.isNotEmpty;
+    final controllerNotifier = ref.watch(historyControllerProvider.notifier);
 
     return Container(
       color: colorScheme.surface,
-      child: AnimatedSwitcher(
-        duration: 400.ms,
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        child: historyAsync.when(
-          data: (historyItems) {
-            final filteredResults = historyItems.where((item) {
-              final title = item.quiz.title.toLowerCase();
-              final category = item.quiz.category.toLowerCase();
-              final difficulty = item.quiz.difficulty;
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (scrollInfo) {
+          // Trigger load more earlier (500px before end) for seamless experience
+          if (scrollInfo.metrics.pixels >=
+                  scrollInfo.metrics.maxScrollExtent - 500 &&
+              controllerNotifier.hasMore &&
+              !controllerNotifier.isLoadingMore) {
+            controllerNotifier.loadMore();
+          }
+          return false;
+        },
+        child: AnimatedSwitcher(
+          duration: 400.ms,
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: historyAsync.when(
+            data: (historyItems) {
+              final filteredResults = historyItems.where((item) {
+                final title = item.quiz.title.toLowerCase();
+                final category = item.quiz.category.toLowerCase();
+                final difficulty = item.quiz.difficulty;
 
-              final matchesSearch =
-                  title.contains(filterState.searchQuery) ||
-                  category.contains(filterState.searchQuery);
+                final matchesSearch =
+                    title.contains(filterState.searchQuery) ||
+                    category.contains(filterState.searchQuery);
 
-              final matchesDifficulty =
-                  filterState.selectedDifficulty == null ||
-                  difficulty.toLowerCase() ==
-                      filterState.selectedDifficulty!.toLowerCase();
+                final matchesDifficulty =
+                    filterState.selectedDifficulty == null ||
+                    difficulty.toLowerCase() ==
+                        filterState.selectedDifficulty!.toLowerCase();
 
-              final matchesCategory =
-                  filterState.selectedCategories.isEmpty ||
-                  filterState.selectedCategories.any(
-                    (c) => category.toLowerCase().contains(c.toLowerCase()),
-                  );
+                final matchesCategory =
+                    filterState.selectedCategories.isEmpty ||
+                    filterState.selectedCategories.any(
+                      (c) => category.toLowerCase().contains(c.toLowerCase()),
+                    );
 
-              return matchesSearch && matchesDifficulty && matchesCategory;
-            }).toList();
+                return matchesSearch && matchesDifficulty && matchesCategory;
+              }).toList();
 
-            if (filteredResults.isEmpty) {
-              return RefreshIndicator(
-                onRefresh: () => ref.refresh(quizHistoryProvider.future),
-                child: CustomScrollView(
-                  key: const ValueKey('empty_list'),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  slivers: [
-                    SliverFillRemaining(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.history_toggle_off,
-                              size: 64,
-                              color: colorScheme.onSurfaceVariant.withValues(
-                                alpha: 0.5,
-                              ),
+              if (filteredResults.isEmpty) {
+                if (historyItems.isEmpty) {
+                  // Truly empty history
+                  return RefreshIndicator(
+                    onRefresh: () =>
+                        ref.refresh(historyControllerProvider.future),
+                    child: CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        SliverFillRemaining(
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.history_toggle_off,
+                                  size: 64,
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.5),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No quizzes found',
+                                  style: TextStyle(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No quizzes found',
-                              style: TextStyle(
-                                color: colorScheme.onSurfaceVariant,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
+                      ],
+                    ),
+                  );
+                }
+                // Filtered to empty, but items exist
+                return Center(child: Text("No matches found"));
+              }
+
+              return RefreshIndicator(
+                onRefresh: () => ref.refresh(historyControllerProvider.future),
+                child: CustomScrollView(
+                  key: const ValueKey('history_list'),
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate((context, index) {
+                          if (index.isOdd) return const SizedBox(height: 12);
+                          final itemIndex = index ~/ 2;
+                          final item = filteredResults[itemIndex];
+
+                          // Use a Key to preserve state and animations correctly
+                          return _HistoryCard(
+                                key: ValueKey(item.quiz.id),
+                                item: item,
+                                isSelected: selectionState.contains(
+                                  item.quiz.id,
+                                ),
+                                isSelectionMode: isSelectionMode,
+                              )
+                              .animate(target: 1) // Ensure animation runs
+                              .fadeIn(duration: 300.ms, curve: Curves.easeOut)
+                              .slideY(
+                                begin: 0.1,
+                                end: 0,
+                                duration: 300.ms,
+                                curve: Curves.easeOut,
+                              );
+                        }, childCount: filteredResults.length * 2 - 1),
                       ),
                     ),
+                    if (controllerNotifier.isLoadingMore)
+                      const SliverToBoxAdapter(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
                   ],
                 ),
               );
-            }
-
-            return RefreshIndicator(
-              onRefresh: () => ref.refresh(quizHistoryProvider.future),
-              child: CustomScrollView(
-                key: const ValueKey('history_list'),
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
-                ),
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        if (index.isOdd) return const SizedBox(height: 12);
-                        final itemIndex = index ~/ 2;
-                        final item = filteredResults[itemIndex];
-                        return _HistoryCard(
-                              item: item,
-                              isSelected: selectionState.contains(item.quiz.id),
-                              isSelectionMode: isSelectionMode,
-                            )
-                            .animate()
-                            .fadeIn(
-                              delay: Duration(milliseconds: 50 * itemIndex),
-                              duration: 300.ms,
-                              curve: Curves.easeOut,
-                            )
-                            .slideY(
-                              begin: 0.1,
-                              end: 0,
-                              duration: 300.ms,
-                              curve: Curves.easeOut,
-                            );
-                      }, childCount: filteredResults.length * 2 - 1),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-          loading: () => const HistoryShimmer(key: ValueKey('history_shimmer')),
-          error: (err, stack) => Center(
-            key: const ValueKey('history_error'),
-            child: Text('Error: $err'),
+            },
+            loading: () =>
+                const HistoryShimmer(key: ValueKey('history_shimmer')),
+            error: (err, stack) => Center(
+              key: const ValueKey('history_error'),
+              child: Text('Error: $err'),
+            ),
           ),
         ),
       ),
@@ -156,6 +192,7 @@ class _HistoryCard extends ConsumerWidget {
   final bool isSelectionMode;
 
   const _HistoryCard({
+    super.key,
     required this.item,
     required this.isSelected,
     required this.isSelectionMode,
@@ -185,27 +222,31 @@ class _HistoryCard extends ConsumerWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
+          onTap: () async {
             if (isSelectionMode) {
               ref.read(historySelectionProvider.notifier).toggle(item.quiz.id);
             } else {
-              if (isCompleted) {
-                context.push(
-                  '/results',
-                  extra: {'result': item.result, 'returnPath': '/history'},
-                );
-              } else {
-                // Pending/Not Attempted: Start the quiz
-                final dashboardConfig = ref
-                    .read(dashboardControllerProvider)
-                    .value;
-                final timePerQuestion =
-                    dashboardConfig?.timePerQuestionSeconds ?? 15;
+              // Fetch full quiz details (including questions) before navigating
+              // show dialog or simple await since it's local DB and fast
+              final repo = ref.read(quizRepositoryProvider);
+              final fullQuiz = await repo.getQuizById(item.quiz.id);
 
-                ref
-                    .read(quizControllerProvider.notifier)
-                    .startQuiz(item.quiz, timePerQuestion);
-                context.push('/quiz', extra: {'returnPath': '/history'});
+              if (fullQuiz != null && context.mounted) {
+                if (isCompleted) {
+                  // Reconstruct result with full quiz
+                  final fullResult = item.result!.copyWith(quiz: fullQuiz);
+                  context.push(
+                    '/results',
+                    extra: {'result': fullResult, 'returnPath': '/history'},
+                  );
+                } else {
+                  // Pending/Not Attempted
+                  context.push('/quiz-setup', extra: fullQuiz);
+                }
+              } else if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Error loading quiz details')),
+                );
               }
             }
           },

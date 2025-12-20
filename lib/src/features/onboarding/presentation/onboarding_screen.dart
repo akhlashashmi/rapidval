@@ -200,27 +200,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   // THE BIG ACTION BUTTON
                   AnimatedSwitcher(
                         duration: const Duration(milliseconds: 300),
-                        transitionBuilder: (child, anim) => FadeTransition(
-                          opacity: anim,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.2),
-                              end: Offset.zero,
-                            ).animate(anim),
-                            child: child,
-                          ),
-                        ),
+                        transitionBuilder: (child, anim) =>
+                            FadeTransition(opacity: anim, child: child),
                         child: AppButton(
                           key: ValueKey(_currentPage == _pages.length - 1),
                           text: _currentPage == _pages.length - 1
                               ? 'Get Started'
                               : 'Continue',
                           onPressed: _onNext,
-                          icon: Icon(
-                            _currentPage == _pages.length - 1
-                                ? FontAwesomeIcons.rocket
-                                : FontAwesomeIcons.arrowRight,
-                            size: 18,
+                          icon: SizedBox(
+                            width: 24,
+                            child: Center(
+                              child: Icon(
+                                _currentPage == _pages.length - 1
+                                    ? FontAwesomeIcons.rocket
+                                    : FontAwesomeIcons.arrowRight,
+                                size: 18,
+                              ),
+                            ),
                           ),
                           borderRadius: 50, // Keep pill shape for onboarding
                         ),
@@ -286,13 +283,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
               )
               .animate(key: ValueKey(page.title))
-              .fadeIn(duration: 600.ms, delay: 100.ms)
-              .moveY(
-                begin: 20,
-                end: 0,
-                duration: 600.ms,
-                curve: Curves.easeOutQuad,
-              ),
+              .fadeIn(duration: 600.ms, delay: 100.ms),
 
           const SizedBox(height: 24),
 
@@ -307,13 +298,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ),
               )
               .animate(key: ValueKey(page.description))
-              .fadeIn(duration: 600.ms, delay: 300.ms)
-              .moveY(
-                begin: 20,
-                end: 0,
-                duration: 600.ms,
-                curve: Curves.easeOutQuad,
-              ),
+              .fadeIn(duration: 600.ms, delay: 300.ms),
 
           const Spacer(flex: 3),
         ],
@@ -416,7 +401,7 @@ class _GlassHero extends StatelessWidget {
                 child: Center(
                   child: Icon(icon, size: 70, color: colorScheme.primary)
                       .animate(target: isActive ? 1 : 0)
-                      .scale(duration: 400.ms, curve: Curves.elasticOut)
+                      .scale(duration: 600.ms, curve: Curves.easeOutBack)
                       .then()
                       .shimmer(
                         duration: 1500.ms,

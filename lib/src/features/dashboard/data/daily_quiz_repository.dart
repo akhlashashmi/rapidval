@@ -27,7 +27,22 @@ class DailyQuizRepository {
     this._hiveService,
   );
 
+  // Static variable to persist across provider rebuilds
+  static DateTime? _nextAllowedRequestTime;
+  static bool _isGenerating = false;
+
   Future<Quiz?> getDailyQuiz() async {
+    // If generation is already in progress, wait for it or return null (debounce)
+    // For this use case, if one is generating, others should probably wait or just return null and wait for stream update
+    // But since this is a Future, let's just return null if busy to avoid duplicate API calls.
+    // The UI will likely retry or loading state persists.
+    if (_isGenerating) {
+      log(
+        'DailyQuizRepository: Generation already in progress. Skipping duplicate request.',
+      );
+      return null;
+    }
+
     try {
       final user = _authRepository.currentUser;
       if (user == null) {
@@ -69,8 +84,14 @@ class DailyQuizRepository {
         }
       }
 
-      return _generateNewDailyQuiz(today);
+      _isGenerating = true;
+      try {
+        return await _generateNewDailyQuiz(today);
+      } finally {
+        _isGenerating = false;
+      }
     } catch (e, stack) {
+      _isGenerating = false;
       log(
         'DailyQuizRepository: Error in getDailyQuiz',
         error: e,
@@ -95,6 +116,15 @@ class DailyQuizRepository {
       final user = _authRepository.currentUser;
       if (user == null) {
         log('DailyQuizRepository: No user logged in.');
+        return null;
+      }
+
+      // Circuit Breaker: Check if we are in a cooldown period
+      if (_nextAllowedRequestTime != null &&
+          DateTime.now().isBefore(_nextAllowedRequestTime!)) {
+        log(
+          'DailyQuizRepository: API rate limited. Skipping request until $_nextAllowedRequestTime',
+        );
         return null;
       }
 
@@ -202,10 +232,12 @@ class DailyQuizRepository {
       return quiz;
     } catch (e, stack) {
       log(
-        'DailyQuizRepository: Error generating daily quiz',
+        'DailyQuizRepository: Error generating daily quiz. Activating circuit breaker.',
         error: e,
         stackTrace: stack,
       );
+      // Set cooldown to 5 minutes to prevent loop
+      _nextAllowedRequestTime = DateTime.now().add(const Duration(minutes: 5));
       rethrow;
     }
   }

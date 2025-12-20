@@ -178,11 +178,11 @@ final class QuizHistoryProvider
         $FunctionalProvider<
           AsyncValue<List<QuizHistoryItem>>,
           List<QuizHistoryItem>,
-          FutureOr<List<QuizHistoryItem>>
+          Stream<List<QuizHistoryItem>>
         >
     with
         $FutureModifier<List<QuizHistoryItem>>,
-        $FutureProvider<List<QuizHistoryItem>> {
+        $StreamProvider<List<QuizHistoryItem>> {
   const QuizHistoryProvider._()
     : super(
         from: null,
@@ -199,14 +199,14 @@ final class QuizHistoryProvider
 
   @$internal
   @override
-  $FutureProviderElement<List<QuizHistoryItem>> $createElement(
+  $StreamProviderElement<List<QuizHistoryItem>> $createElement(
     $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
+  ) => $StreamProviderElement(pointer);
 
   @override
-  FutureOr<List<QuizHistoryItem>> create(Ref ref) {
+  Stream<List<QuizHistoryItem>> create(Ref ref) {
     return quizHistory(ref);
   }
 }
 
-String _$quizHistoryHash() => r'4aa1c036d29ab324fb21d09a1c12ade6b51b6bb8';
+String _$quizHistoryHash() => r'c12bb3d92c82a9ea1d626f996d33ff5590b2b053';
