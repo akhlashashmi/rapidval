@@ -12,7 +12,6 @@ import 'dashboard_stats_provider.dart';
 import 'widgets/dashboard_shimmer.dart';
 import 'widgets/daily_quiz_card.dart';
 import 'widgets/daily_quiz_loading_card.dart';
-import 'dashboard_controller.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -64,7 +63,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 physics: const BouncingScrollPhysics(),
                 slivers: [
                   SliverPadding(
-                    // Consistent padding around the entire dashboard
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
@@ -79,7 +77,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           data: (quiz) {
                             if (quiz == null) return const SizedBox.shrink();
 
-                            // Check if the daily quiz is already active (in "Continue Learning")
                             final activeState =
                                 activeQuizProgressAsync.value?.$1;
                             if (activeState != null &&
@@ -214,7 +211,6 @@ class _ActiveQuizHeroCard extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  // "Play" Indicator
                   Container(
                     height: 48,
                     width: 48,
@@ -451,20 +447,36 @@ class _RecentQuizzesContainer extends ConsumerWidget {
                           ),
                         ),
                       ),
-                onTap: () {
-                  if (isCompleted) {
-                    context.push('/results', extra: item.result);
-                  } else {
-                    final dashboardConfig = ref
-                        .read(dashboardControllerProvider)
-                        .value;
-                    final timePerQuestion =
-                        dashboardConfig?.timePerQuestionSeconds ?? 15;
+                onTap: () async {
+                  // Fetch full quiz details (including questions)
+                  try {
+                    final fullQuiz = await ref
+                        .read(quizRepositoryProvider)
+                        .getQuizById(item.quiz.id);
 
-                    ref
-                        .read(quizControllerProvider.notifier)
-                        .startQuiz(item.quiz, timePerQuestion);
-                    context.push('/quiz');
+                    if (!context.mounted) return;
+
+                    if (fullQuiz == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Unable to load quiz details'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    if (isCompleted) {
+                      final fullResult = item.result!.copyWith(quiz: fullQuiz);
+                      context.push('/results', extra: fullResult);
+                    } else {
+                      context.push('/quiz-setup', extra: fullQuiz);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error loading quiz: $e')),
+                      );
+                    }
                   }
                 },
               ),

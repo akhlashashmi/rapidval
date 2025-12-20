@@ -4,6 +4,7 @@ import '../domain/quiz_entity.dart';
 import '../domain/user_answer.dart';
 import 'quiz_state.dart';
 import '../data/quiz_repository.dart';
+import '../../dashboard/data/daily_quiz_repository.dart';
 
 import '../../auth/data/auth_repository.dart';
 
@@ -13,6 +14,9 @@ part 'quiz_controller.g.dart';
 class QuizController extends _$QuizController {
   Timer? _timer;
   int _timePerQuestion = 15;
+
+  /// Expose the time per question for UI purposes
+  int get timePerQuestion => _timePerQuestion;
 
   @override
   QuizState? build() {
@@ -179,6 +183,28 @@ class QuizController extends _$QuizController {
     }
   }
 
+  /// Navigate to the previous question
+  /// Returns true if navigation was successful, false if already at first question
+  bool previousQuestion() {
+    if (state == null) return false;
+
+    final prevIndex = state!.currentQuestionIndex - 1;
+    if (prevIndex >= 0) {
+      state = state!.copyWith(
+        currentQuestionIndex: prevIndex,
+        timeLeft: _timePerQuestion, // Reset timer for previous question
+      );
+      ref
+          .read(quizRepositoryProvider)
+          .saveQuizProgress(state!, _timePerQuestion);
+      return true;
+    }
+    return false; // Already at first question
+  }
+
+  /// Check if we can go to the previous question
+  bool get canGoPrevious => state != null && state!.currentQuestionIndex > 0;
+
   Future<void> finishQuiz() async {
     _timer?.cancel();
     state = state!.copyWith(isCompleted: true);
@@ -191,6 +217,7 @@ class QuizController extends _$QuizController {
       ref.invalidate(recentQuizResultsProvider);
       ref.invalidate(allQuizResultsProvider);
       ref.invalidate(activeQuizProgressProvider);
+      ref.invalidate(dailyQuizProvider);
     }
   }
 

@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../auth/data/user_repository.dart';
-import '../../auth/data/auth_repository.dart';
-import '../../auth/presentation/user_controller.dart';
 import '../../../core/widgets/app_button.dart';
+import '../../auth/data/auth_repository.dart';
+import '../../auth/data/user_repository.dart';
+import '../../auth/presentation/user_controller.dart';
 
 class CategorySelectionScreen extends ConsumerStatefulWidget {
   final bool isSettingsMode;
@@ -14,12 +14,10 @@ class CategorySelectionScreen extends ConsumerStatefulWidget {
   const CategorySelectionScreen({super.key, this.isSettingsMode = false});
 
   @override
-  ConsumerState<CategorySelectionScreen> createState() =>
-      _CategorySelectionScreenState();
+  ConsumerState<CategorySelectionScreen> createState() => _CategorySelectionScreenState();
 }
 
-class _CategorySelectionScreenState
-    extends ConsumerState<CategorySelectionScreen> {
+class _CategorySelectionScreenState extends ConsumerState<CategorySelectionScreen> {
   final List<String> _selectedTopics = [];
   final TextEditingController _topicController = TextEditingController();
   bool _isLoading = false;
@@ -31,9 +29,7 @@ class _CategorySelectionScreenState
     if (widget.isSettingsMode && !_isInitialized) {
       final userProfile = ref.read(userProfileProvider).value;
       if (userProfile != null) {
-        _selectedTopics.addAll(
-          userProfile.selectedCategories.map(_fromSnakeCase),
-        );
+        _selectedTopics.addAll(userProfile.selectedCategories.map(_fromSnakeCase));
       }
       _isInitialized = true;
     }
@@ -48,11 +44,7 @@ class _CategorySelectionScreenState
     if (text.trim().isEmpty) return;
 
     // Split by comma, trim each part, and filter out empty strings
-    final topics = text
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+    final topics = text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
     bool changed = false;
     bool limitReached = false;
@@ -64,9 +56,7 @@ class _CategorySelectionScreenState
       }
 
       // Case-insensitive check for duplicates
-      final isDuplicate = _selectedTopics.any(
-        (t) => t.toLowerCase() == topic.toLowerCase(),
-      );
+      final isDuplicate = _selectedTopics.any((t) => t.toLowerCase() == topic.toLowerCase());
 
       if (!isDuplicate) {
         _selectedTopics.add(topic);
@@ -82,15 +72,11 @@ class _CategorySelectionScreenState
 
     if (limitReached) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You can add up to 8 topics only.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can add up to 8 topics only.')));
       }
     } else if (!changed && topics.isNotEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Topic(s) already added.')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Topic(s) already added.')));
       }
     }
   }
@@ -102,18 +88,12 @@ class _CategorySelectionScreenState
   }
 
   String _toSnakeCase(String text) {
-    return text
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'\s+'), '_')
-        .replaceAll(RegExp(r'[^a-z0-9_]'), '');
+    return text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_').replaceAll(RegExp(r'[^a-z0-9_]'), '');
   }
 
   Future<void> _submit() async {
     if (_selectedTopics.length < 5) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least 5 topics.')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please add at least 5 topics.')));
       return;
     }
 
@@ -126,15 +106,11 @@ class _CategorySelectionScreenState
       if (user != null) {
         final formattedTopics = _selectedTopics.map(_toSnakeCase).toList();
 
-        await ref
-            .read(userRepositoryProvider)
-            .updateCategories(user.uid, formattedTopics);
+        await ref.read(userRepositoryProvider).updateCategories(user.uid, formattedTopics);
 
         if (mounted) {
           if (widget.isSettingsMode) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Topics updated successfully')),
-            );
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Topics updated successfully')));
             context.pop();
           } else {
             context.go('/dashboard');
@@ -143,9 +119,7 @@ class _CategorySelectionScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving preferences: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving preferences: $e')));
       }
     } finally {
       if (mounted) {
@@ -182,22 +156,13 @@ class _CategorySelectionScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                widget.isSettingsMode
-                    ? 'Edit your interests'
-                    : 'What do you want to learn?',
-                style: GoogleFonts.outfit(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+                widget.isSettingsMode ? 'Edit your interests' : 'What do you want to learn?',
+                style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
               ),
               const SizedBox(height: 8),
               Text(
                 'Add 5 to 8 topics to personalize your experience. You can add multiple topics separated by commas.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.5,
-                ),
+                style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant, height: 1.5),
               ),
               const SizedBox(height: 32),
 
@@ -211,33 +176,22 @@ class _CategorySelectionScreenState
                       style: GoogleFonts.outfit(fontSize: 16),
                       decoration: InputDecoration(
                         hintText: 'e.g. Flutter, History, Science',
-                        hintStyle: GoogleFonts.outfit(
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-                        ),
+                        hintStyle: GoogleFonts.outfit(color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
                         filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest
-                            .withOpacity(0.3),
+                        fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.3),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
                           borderSide: BorderSide.none,
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(
-                            color: colorScheme.outline.withOpacity(0.1),
-                          ),
+                          borderSide: BorderSide(color: colorScheme.outline.withOpacity(0.1)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide(
-                            color: colorScheme.primary,
-                            width: 2,
-                          ),
+                          borderSide: BorderSide(color: colorScheme.primary, width: 2),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                       ),
                       onSubmitted: (_) => _addTopic(),
                     ),
@@ -249,9 +203,7 @@ class _CategorySelectionScreenState
                     style: IconButton.styleFrom(
                       backgroundColor: colorScheme.primary,
                       foregroundColor: colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       padding: const EdgeInsets.all(12),
                       minimumSize: const Size(56, 56),
                     ),
@@ -264,25 +216,21 @@ class _CategorySelectionScreenState
               Expanded(
                 child: _selectedTopics.isEmpty
                     ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.auto_awesome_outlined,
-                              size: 48,
-                              color: colorScheme.primary.withOpacity(0.2),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Your topics will appear here',
-                              style: GoogleFonts.outfit(
-                                color: colorScheme.onSurfaceVariant.withOpacity(
-                                  0.5,
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.auto_awesome_outlined, size: 48, color: colorScheme.primary.withOpacity(0.2)),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Your topics will appear here',
+                                style: GoogleFonts.outfit(
+                                  color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                                  fontSize: 16,
                                 ),
-                                fontSize: 16,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       )
                     : SingleChildScrollView(
@@ -291,16 +239,11 @@ class _CategorySelectionScreenState
                           runSpacing: 12,
                           children: _selectedTopics.map((topic) {
                             return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 10,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               decoration: BoxDecoration(
                                 color: colorScheme.surface,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: colorScheme.outline.withOpacity(0.2),
-                                ),
+                                border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
                                 boxShadow: [
                                   BoxShadow(
                                     color: Colors.black.withOpacity(0.02),
@@ -326,11 +269,7 @@ class _CategorySelectionScreenState
                                     borderRadius: BorderRadius.circular(12),
                                     child: Padding(
                                       padding: const EdgeInsets.all(2.0),
-                                      child: Icon(
-                                        Icons.close_rounded,
-                                        size: 16,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
+                                      child: Icon(Icons.close_rounded, size: 16, color: colorScheme.onSurfaceVariant),
                                     ),
                                   ),
                                 ],
@@ -352,17 +291,12 @@ class _CategorySelectionScreenState
                     style: GoogleFonts.outfit(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: _selectedTopics.length >= 5
-                          ? colorScheme.primary
-                          : colorScheme.error,
+                      color: _selectedTopics.length >= 5 ? colorScheme.primary : colorScheme.error,
                     ),
                   ),
                   Text(
                     ' / 8 topics added',
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                    style: GoogleFonts.outfit(fontSize: 16, color: colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),

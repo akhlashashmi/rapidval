@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_outlined_button.dart';
+import '../../quiz/data/quiz_repository.dart';
 // import '../../dashboard/data/daily_quiz_repository.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -38,6 +39,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       showDragHandle: true,
       useRootNavigator: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       builder: (context) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -89,6 +91,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       showDragHandle: true,
       useRootNavigator: true,
+      backgroundColor: theme.colorScheme.surfaceContainerLow,
       builder: (context) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -152,7 +155,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       isScrollControlled: true,
       useRootNavigator: true,
       showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       builder: (context) => const _DeveloperProfileSheet(),
     );
   }
@@ -169,6 +172,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       isScrollControlled: true,
       showDragHandle: true,
       useRootNavigator: true,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
       builder: (context) => Padding(
         padding: EdgeInsets.only(
           bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -276,6 +280,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirm = await showModalBottomSheet<bool>(
       context: context,
       showDragHandle: true,
+      backgroundColor: theme.colorScheme.surfaceContainerLow,
       builder: (context) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -329,6 +334,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
+        final userId = ref.read(authRepositoryProvider).currentUser?.uid;
+        if (userId != null) {
+          await ref.read(quizRepositoryProvider).deleteAllDataForUser(userId);
+        }
         await ref.read(authRepositoryProvider).deleteAccount();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -443,6 +452,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           );
                           await FirebaseAuth.instance.currentUser
                               ?.reauthenticateWithCredential(credential);
+
+                          final userId = ref
+                              .read(authRepositoryProvider)
+                              .currentUser
+                              ?.uid;
+                          if (userId != null) {
+                            await ref
+                                .read(quizRepositoryProvider)
+                                .deleteAllDataForUser(userId);
+                          }
+
                           await ref
                               .read(authRepositoryProvider)
                               .deleteAccount();
@@ -488,6 +508,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       showDragHandle: true,
       isDismissible: false,
       enableDrag: false,
+      backgroundColor: theme.colorScheme.surfaceContainerLow,
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -529,6 +550,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             .signInWithGoogle();
                         if (user != null) {
                           // Re-auth successful, try deleting again
+                          final userId = ref
+                              .read(authRepositoryProvider)
+                              .currentUser
+                              ?.uid;
+                          if (userId != null) {
+                            await ref
+                                .read(quizRepositoryProvider)
+                                .deleteAllDataForUser(userId);
+                          }
+
                           await ref
                               .read(authRepositoryProvider)
                               .deleteAccount();
@@ -569,52 +600,74 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _showSignOutBottomSheet(BuildContext context) async {
     final theme = Theme.of(context);
-    final confirm = await showModalBottomSheet<bool>(
+    final colorScheme = theme.colorScheme;
+
+    // Show the data management bottom sheet with clear options
+    final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
+      backgroundColor: colorScheme.surfaceContainerLow,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                Icons.logout_rounded,
-                size: 48,
-                color: theme.colorScheme.primary,
-              ),
+              Icon(Icons.logout_rounded, size: 48, color: colorScheme.primary),
               const SizedBox(height: 16),
               Text(
-                'Sign Out?',
+                'Sign Out',
+                textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Are you sure you want to sign out of your account?',
+                'Choose what happens to your local quiz data',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppOutlinedButton(
-                      onPressed: () => context.pop(false),
-                      text: 'Cancel',
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: AppButton(
-                      onPressed: () => context.pop(true),
-                      text: 'Sign Out',
-                    ),
-                  ),
-                ],
+
+              // Option 1: Keep Data
+              _SignOutOptionCard(
+                icon: Icons.save_outlined,
+                iconColor: colorScheme.primary,
+                title: 'Keep Data & Sign Out',
+                subtitle: 'Your quizzes stay on this device for later',
+                onTap: () => Navigator.pop(context, 'keep'),
+              ),
+              const SizedBox(height: 12),
+
+              // Option 2: Backup First
+              _SignOutOptionCard(
+                icon: Icons.cloud_upload_outlined,
+                iconColor: colorScheme.tertiary,
+                title: 'Backup Data First',
+                subtitle: 'Save to cloud before signing out',
+                onTap: () => Navigator.pop(context, 'backup'),
+              ),
+              const SizedBox(height: 12),
+
+              // Option 3: Delete Data
+              _SignOutOptionCard(
+                icon: Icons.delete_outline_rounded,
+                iconColor: colorScheme.error,
+                title: 'Delete Data & Sign Out',
+                subtitle: 'Remove all local quiz data permanently',
+                onTap: () => Navigator.pop(context, 'delete'),
+                isDanger: true,
+              ),
+
+              const SizedBox(height: 20),
+              AppOutlinedButton(
+                onPressed: () => Navigator.pop(context, 'cancel'),
+                text: 'Cancel',
               ),
             ],
           ),
@@ -622,9 +675,81 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
 
-    if (confirm == true) {
+    if (!mounted || action == null || action == 'cancel') return;
+
+    // Handle each action
+    if (action == 'backup') {
+      context.push('/backups');
+      return;
+    }
+
+    if (action == 'delete') {
+      // Show confirmation for destructive action
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          icon: Icon(
+            Icons.warning_amber_rounded,
+            color: colorScheme.error,
+            size: 48,
+          ),
+          title: const Text('Delete All Data?'),
+          content: Text(
+            'This will permanently delete all your quizzes, results, and progress from this device. This action cannot be undone.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
+              child: const Text('Delete & Sign Out'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !mounted) return;
+    }
+
+    // Perform the sign out with loading state
+    setState(() => _isLoading = true);
+
+    try {
+      final userId = ref.read(authRepositoryProvider).currentUser?.uid;
+
+      if (action == 'delete' && userId != null) {
+        // Delete all local data for this user
+        await ref.read(quizRepositoryProvider).deleteAllDataForUser(userId);
+        debugPrint('Successfully deleted all data for user: $userId');
+      }
+
+      // Sign out from Firebase
       await ref.read(authRepositoryProvider).signOut();
-      if (mounted) context.go('/auth');
+
+      // Invalidate all data providers to clear cached state
+      ref.invalidate(recentQuizResultsProvider);
+      ref.invalidate(allQuizResultsProvider);
+
+      if (mounted) {
+        context.go('/auth');
+      }
+    } catch (e) {
+      debugPrint('Sign out error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error signing out: ${e.toString()}'),
+            backgroundColor: colorScheme.error,
+          ),
+        );
+      }
     }
   }
 
@@ -1134,6 +1259,88 @@ class _SocialButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
         ),
         child: Icon(icon, color: color, size: 24),
+      ),
+    );
+  }
+}
+
+class _SignOutOptionCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool isDanger;
+
+  const _SignOutOptionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.isDanger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDanger
+                ? colorScheme.errorContainer.withValues(alpha: 0.2)
+                : colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: isDanger
+                            ? colorScheme.error
+                            : colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                size: 20,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

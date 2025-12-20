@@ -63,8 +63,8 @@ class HistoryFilterBar extends StatelessWidget implements PreferredSizeWidget {
                 child: PopupMenuButton<String>(
                   tooltip: 'Filter Options',
                   offset: const Offset(0, 8),
-                  elevation: 4,
-                  shadowColor: Colors.black.withValues(alpha: 0.3),
+                  elevation: 8,
+                  shadowColor: Colors.black.withValues(alpha: 0.4),
                   constraints: const BoxConstraints(
                     maxWidth: 320,
                     minWidth: 280,
@@ -72,11 +72,14 @@ class HistoryFilterBar extends StatelessWidget implements PreferredSizeWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+                      color: colorScheme.primary.withValues(alpha: 0.12),
                     ),
                   ),
-                  color: colorScheme.surfaceContainerLow,
-                  surfaceTintColor: colorScheme.secondaryContainer,
+                  color: Color.alphaBlend(
+                    colorScheme.primary.withValues(alpha: 0.08),
+                    colorScheme.surface,
+                  ),
+                  surfaceTintColor: Colors.transparent,
                   icon: Badge(
                     isLabelVisible: activeFiltersCount > 0,
                     label: Text('$activeFiltersCount'),

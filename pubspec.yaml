@@ -43,6 +43,9 @@ dependencies:
   package_info_plus: ^9.0.0
   flutter_svg: ^2.0.10
   firebase_crashlytics: ^5.0.5
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  screenshot: ^3.0.0
 
 dev_dependencies:
   flutter_test:

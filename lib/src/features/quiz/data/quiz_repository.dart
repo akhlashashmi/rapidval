@@ -268,56 +268,114 @@ class QuizRepository {
     return domainResults;
   }
 
-  Future<List<QuizHistoryItem>> getQuizHistory() async {
-    debugPrint('QuizRepository: getQuizHistory called');
+  Stream<List<QuizHistoryItem>> watchQuizHistory({int limit = 20}) {
     final userId = _authRepository.currentUser?.uid ?? '';
 
-    final query = _db.select(_db.quizzes).join([
-      drift.leftOuterJoin(
-        _db.quizResults,
-        _db.quizResults.quizId.equalsExp(_db.quizzes.id) &
-            _db.quizResults.userId.equals(userId),
-      ),
-    ])..where(_db.quizzes.userId.equals(userId));
+    // Create the base query with join
+    final query =
+        _db.select(_db.quizzes).join([
+            drift.leftOuterJoin(
+              _db.quizResults,
+              _db.quizResults.quizId.equalsExp(_db.quizzes.id) &
+                  _db.quizResults.userId.equals(userId),
+            ),
+          ])
+          ..where(_db.quizzes.userId.equals(userId))
+          ..orderBy([
+            drift.OrderingTerm(
+              expression: drift.coalesce([
+                _db.quizResults.completedAt,
+                _db.quizzes.createdAt,
+              ]),
+              mode: drift.OrderingMode.desc,
+            ),
+          ])
+          ..limit(limit);
+
+    // Optimized: Map synchronously without extra DB calls
+    return query.watch().map((rows) {
+      return rows
+          .map((row) => _mapQuizHistoryItem(row))
+          .whereType<QuizHistoryItem>()
+          .toList();
+    });
+  }
+
+  Future<List<QuizHistoryItem>> getQuizHistoryPage({
+    required DateTime beforeDate,
+    int limit = 20,
+  }) async {
+    final userId = _authRepository.currentUser?.uid ?? '';
+
+    // Use coalesce for pagination cursor
+    final effectiveDate = drift.coalesce([
+      _db.quizResults.completedAt,
+      _db.quizzes.createdAt,
+    ]);
+
+    final query =
+        _db.select(_db.quizzes).join([
+            drift.leftOuterJoin(
+              _db.quizResults,
+              _db.quizResults.quizId.equalsExp(_db.quizzes.id) &
+                  _db.quizResults.userId.equals(userId),
+            ),
+          ])
+          ..where(
+            _db.quizzes.userId.equals(userId) &
+                effectiveDate.isSmallerThanValue(beforeDate),
+          )
+          ..orderBy([
+            drift.OrderingTerm(
+              expression: effectiveDate,
+              mode: drift.OrderingMode.desc,
+            ),
+          ])
+          ..limit(limit);
 
     final rows = await query.get();
-    final List<QuizHistoryItem> history = [];
+    return rows
+        .map((row) => _mapQuizHistoryItem(row))
+        .whereType<QuizHistoryItem>()
+        .toList();
+  }
 
-    for (final row in rows) {
-      final quizRow = row.readTable(_db.quizzes);
-      final resultRow = row.readTableOrNull(_db.quizResults);
+  QuizHistoryItem? _mapQuizHistoryItem(TypedResult row) {
+    final quizRow = row.readTable(_db.quizzes);
+    final resultRow = row.readTableOrNull(_db.quizResults);
 
-      final quiz = await getQuizById(quizRow.id);
-      if (quiz != null) {
-        QuizResult? result;
-        if (resultRow != null) {
-          result = QuizResult(
-            quizId: resultRow.quizId,
-            quiz: quiz,
-            answers: resultRow.answers,
-            startedAt: resultRow.completedAt.subtract(
-              const Duration(minutes: 5),
-            ),
-            completedAt: resultRow.completedAt,
-            correctAnswers: resultRow.score,
-            totalQuestions: resultRow.totalQuestions,
-            percentage: resultRow.percentage,
-          );
-        }
+    // OPTIMIZATION: Do not fetch questions for history list
+    final quiz = Quiz(
+      id: quizRow.id,
+      topic: quizRow.topic,
+      title: quizRow.title,
+      category: quizRow.category,
+      topics: quizRow.topics,
+      difficulty: quizRow.difficulty,
+      questions: const [], // Empty list for list view performance
+      createdAt: quizRow.createdAt,
+    );
 
-        history.add(QuizHistoryItem(quiz: quiz, result: result));
-      }
+    QuizResult? result;
+    if (resultRow != null) {
+      result = QuizResult(
+        quizId: resultRow.quizId,
+        quiz: quiz,
+        answers: resultRow.answers,
+        // Approximate startedAt if not stored, or infer
+        startedAt: resultRow.completedAt.subtract(const Duration(minutes: 5)),
+        completedAt: resultRow.completedAt,
+        correctAnswers: resultRow.score,
+        totalQuestions: resultRow.totalQuestions,
+        percentage: resultRow.percentage,
+      );
     }
+    return QuizHistoryItem(quiz: quiz, result: result);
+  }
 
-    // Sort by most recent activity (completedAt or createdAt)
-    history.sort((a, b) {
-      final aTime = a.result?.completedAt ?? a.quiz.createdAt;
-      final bTime = b.result?.completedAt ?? b.quiz.createdAt;
-      return bTime.compareTo(aTime);
-    });
-
-    debugPrint('QuizRepository: getQuizHistory found ${history.length} items');
-    return history;
+  // Deprecated: Use watchQuizHistory or getQuizHistoryPage
+  Future<List<QuizHistoryItem>> getQuizHistory() async {
+    return watchQuizHistory(limit: 100).first;
   }
 
   Future<void> saveQuizProgress(QuizState state, int timePerQuestion) async {
@@ -401,9 +459,11 @@ class QuizRepository {
   }
 
   Future<Quiz?> getQuizById(String id) async {
-    final quizRow = await (_db.select(
-      _db.quizzes,
-    )..where((t) => t.id.equals(id))).getSingleOrNull();
+    final userId = _authRepository.currentUser?.uid ?? '';
+    final quizRow =
+        await (_db.select(_db.quizzes)
+              ..where((t) => t.id.equals(id) & t.userId.equals(userId)))
+            .getSingleOrNull();
     if (quizRow == null) return null;
 
     final questionsRows = await (_db.select(
@@ -449,6 +509,32 @@ class QuizRepository {
             .getSingleOrNull();
     return result != null;
   }
+
+  Future<void> deleteAllDataForUser(String userId) async {
+    debugPrint('QuizRepository: deleteAllDataForUser called for $userId');
+    await _db.transaction(() async {
+      // Cascade delete should handle related tables if configured,
+      // but to be safe and explicit:
+
+      // 1. Delete Results
+      await (_db.delete(
+        _db.quizResults,
+      )..where((t) => t.userId.equals(userId))).go();
+
+      // 2. Delete Progress
+      await (_db.delete(
+        _db.quizProgress,
+      )..where((t) => t.userId.equals(userId))).go();
+
+      // 3. Delete Quizzes (Questions should cascade via DB constraints if set, otherwise we might leave orphans.
+      // Drift default foreign keys usually strictly enforce or cascade if set.
+      // Assuming questions are bound to quizId. If questions don't have userId, deleting quiz is enough.)
+      await (_db.delete(
+        _db.quizzes,
+      )..where((t) => t.userId.equals(userId))).go();
+    });
+    debugPrint('QuizRepository: deleteAllDataForUser success');
+  }
 }
 
 @Riverpod(keepAlive: true)
@@ -461,20 +547,25 @@ QuizRepository quizRepository(Ref ref) {
 
 @Riverpod(keepAlive: true)
 Future<List<QuizResult>> recentQuizResults(Ref ref) {
+  ref.watch(authStateChangesProvider);
   return ref.watch(quizRepositoryProvider).getRecentResults();
 }
 
 @Riverpod(keepAlive: true)
 Future<List<QuizResult>> allQuizResults(Ref ref) {
+  ref.watch(authStateChangesProvider);
   return ref.watch(quizRepositoryProvider).getAllResults();
 }
 
 @Riverpod(keepAlive: true)
 Future<(QuizState, int)?> activeQuizProgress(Ref ref) {
+  ref.watch(authStateChangesProvider);
   return ref.watch(quizRepositoryProvider).getQuizProgress();
 }
 
 @Riverpod(keepAlive: true)
-Future<List<QuizHistoryItem>> quizHistory(Ref ref) {
-  return ref.watch(quizRepositoryProvider).getQuizHistory();
+Stream<List<QuizHistoryItem>> quizHistory(Ref ref) {
+  ref.watch(authStateChangesProvider);
+  // Dashboard typically needs limited history, but here we can stick to 20 or stream active updates
+  return ref.watch(quizRepositoryProvider).watchQuizHistory(limit: 20);
 }

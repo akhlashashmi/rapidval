@@ -28,7 +28,7 @@ class DailyQuizCard extends ConsumerWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: () async {
-          await context.push('/create-quiz', extra: quiz);
+          await context.push('/quiz-setup', extra: quiz);
           ref.invalidate(dailyQuizProvider);
         },
         child: Padding(

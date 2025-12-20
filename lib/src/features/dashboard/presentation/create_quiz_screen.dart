@@ -8,14 +8,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../domain/quiz_config.dart';
 import 'dashboard_controller.dart';
 import '../../quiz/data/quiz_repository.dart';
-import '../../quiz/domain/quiz_entity.dart';
 import '../../quiz/presentation/quiz_controller.dart';
 import '../../../core/widgets/app_button.dart';
 
 class CreateQuizScreen extends ConsumerStatefulWidget {
-  final Quiz? existingQuiz;
-
-  const CreateQuizScreen({super.key, this.existingQuiz});
+  const CreateQuizScreen({super.key});
 
   @override
   ConsumerState<CreateQuizScreen> createState() => _CreateQuizScreenState();
@@ -30,24 +27,9 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.existingQuiz != null) {
-      _topicController.text = widget.existingQuiz!.topic;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final controller = ref.read(dashboardControllerProvider.notifier);
-        controller.setTopic(widget.existingQuiz!.topic);
-        controller.setQuestionCount(widget.existingQuiz!.questions.length);
-        try {
-          final diff = QuizDifficulty.values.firstWhere(
-            (e) => e.name == widget.existingQuiz!.difficulty,
-          );
-          controller.setDifficulty(diff);
-        } catch (_) {}
-      });
-    } else {
-      final config = ref.read(dashboardControllerProvider).value;
-      if (config != null && config.topic.isNotEmpty) {
-        _topicController.text = config.topic;
-      }
+    final config = ref.read(dashboardControllerProvider).value;
+    if (config != null && config.topic.isNotEmpty) {
+      _topicController.text = config.topic;
     }
   }
 
@@ -79,29 +61,6 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
       _isLoading = true;
       _progress = 0.0;
     });
-
-    if (widget.existingQuiz != null) {
-      try {
-        final quiz = widget.existingQuiz!;
-        if (!mounted) return;
-        ref
-            .read(quizControllerProvider.notifier)
-            .startQuiz(quiz, config.timePerQuestionSeconds);
-        // Replace current screen with quiz
-        context.pushReplacement('/quiz', extra: {'returnPath': '/dashboard'});
-      } catch (e) {
-        log('Error starting existing quiz: $e');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Something went wrong. Please try again.'),
-            ),
-          );
-          setState(() => _isLoading = false);
-        }
-      }
-      return;
-    }
 
     // Start Stream
     _generationSubscription?.cancel();
@@ -147,7 +106,6 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
     final controller = ref.read(dashboardControllerProvider.notifier);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isRetake = widget.existingQuiz != null;
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -159,12 +117,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
           onPressed: _isLoading ? null : () => context.pop(),
           icon: Icon(Icons.arrow_back_rounded, color: colorScheme.onSurface),
         ),
-        title: Text(
-          isRetake ? 'Retake Quiz' : 'New Quiz',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: Text('New Quiz', style: theme.textTheme.titleLarge?.copyWith()),
       ),
       body: configAsync.when(
         data: (config) => PopScope(
@@ -181,8 +134,8 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                         children: [
                           // Topic Input Section
                           Text(
-                            'What would you like to learn?',
-                            style: theme.textTheme.headlineSmall?.copyWith(
+                            'Your topic',
+                            style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: colorScheme.onSurface,
                             ),
@@ -195,7 +148,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                           TextField(
                                 controller: _topicController,
                                 onChanged: controller.setTopic,
-                                enabled: !isRetake && !_isLoading,
+                                enabled: !_isLoading,
                                 style: theme.textTheme.bodyLarge,
                                 decoration: InputDecoration(
                                   hintText: 'e.g., Quantum Physics, Flutter...',
@@ -275,7 +228,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                                             onChanged: (v) =>
                                                 controller.setDifficulty(v),
                                             color: const Color(0xFF22C55E),
-                                            enabled: !isRetake && !_isLoading,
+                                            enabled: !_isLoading,
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -287,7 +240,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                                             onChanged: (v) =>
                                                 controller.setDifficulty(v),
                                             color: const Color(0xFFF59E0B),
-                                            enabled: !isRetake && !_isLoading,
+                                            enabled: !_isLoading,
                                           ),
                                         ),
                                         const SizedBox(width: 8),
@@ -299,7 +252,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                                             onChanged: (v) =>
                                                 controller.setDifficulty(v),
                                             color: const Color(0xFFEF4444),
-                                            enabled: !isRetake && !_isLoading,
+                                            enabled: !_isLoading,
                                           ),
                                         ),
                                       ],
@@ -327,7 +280,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                                           .toDouble(),
                                       onChanged: (v) => controller
                                           .setQuestionCount(v.toInt()),
-                                      enabled: !isRetake && !_isLoading,
+                                      enabled: !_isLoading,
                                     ),
                                     const SizedBox(height: 24),
 
@@ -382,13 +335,8 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                             onPressed: _isLoading || config.topic.isEmpty
                                 ? null
                                 : _startQuiz,
-                            text: isRetake ? 'Retake Quiz' : 'Generate Quiz',
-                            icon: Icon(
-                              isRetake
-                                  ? Icons.refresh_rounded
-                                  : Icons.auto_awesome_rounded,
-                              size: 20,
-                            ),
+                            text: 'Generate Quiz',
+                            icon: Icon(Icons.auto_awesome_rounded, size: 20),
                           ),
                         ),
                       )

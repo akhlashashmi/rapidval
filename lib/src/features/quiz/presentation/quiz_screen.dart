@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 import '../domain/user_answer.dart';
 import '../domain/quiz_entity.dart';
 import 'quiz_controller.dart';
-import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_outlined_button.dart';
+import '../../../core/widgets/app_button.dart';
+import 'widgets/report_bottom_sheet.dart';
+import 'widgets/share_question_bottom_sheet.dart';
 
 class QuizScreen extends ConsumerStatefulWidget {
   final bool isReviewMode;
@@ -67,11 +69,20 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
 
   @override
   Widget build(BuildContext context) {
-    final quizState = ref.watch(quizControllerProvider);
+    // Only watch question index and completion status
+    // userAnswers is watched separately in options section to avoid rebuilding question
+    final currentQuestionIndex = ref.watch(
+      quizControllerProvider.select(
+        (state) => state?.currentQuestionIndex ?? 0,
+      ),
+    );
+    final isCompleted = ref.watch(
+      quizControllerProvider.select((state) => state?.isCompleted ?? false),
+    );
+    final quizState = ref.read(quizControllerProvider);
 
-    // --- Loading / Empty States ---
     if (quizState == null && !widget.isReviewMode) return _buildNoQuizState();
-    if (quizState != null && quizState.isCompleted && !widget.isReviewMode) {
+    if (isCompleted && !widget.isReviewMode) {
       _handleQuizCompletion();
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -79,175 +90,228 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
       return _buildErrorState();
     }
 
-    // --- Data Preparation ---
     final quiz = widget.isReviewMode
         ? widget.quizResult!.quiz
         : quizState!.quiz;
     final currentIndex = widget.isReviewMode
         ? _reviewIndex
-        : quizState!.currentQuestionIndex;
+        : currentQuestionIndex;
     final question = quiz.questions[currentIndex];
     final totalQuestions = quiz.questions.length;
-
-    // Logic for selected answer
-    final UserAnswer? userAnswer = widget.isReviewMode
-        ? widget.quizResult!.answers.firstWhere(
-            (a) => a.questionIndex == currentIndex,
-            orElse: () => UserAnswer(
-              questionIndex: currentIndex,
-              selectedOptionIndex: -1,
-              answeredAt: DateTime.now(),
-            ),
-          )
-        : ref
-              .read(quizControllerProvider.notifier)
-              .getAnswerForQuestion(currentIndex);
-
-    final bool isAnswered = widget.isReviewMode ? true : userAnswer != null;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
-            // 1. Fixed Header (Progress & Topic)
-            _QuizHeader(
-              currentIndex: currentIndex,
-              totalQuestions: totalQuestions,
-              title: quiz.title,
-              category: quiz.category,
-              timeLeft: widget.isReviewMode ? 0 : quizState!.timeLeft,
-              isReviewMode: widget.isReviewMode,
-              pulseController: _timerPulseController,
-              onClose: () => _handleClose(context),
+            // Isolate header to prevent full screen rebuilds
+            Consumer(
+              builder: (context, ref, _) {
+                final quizState = ref.watch(quizControllerProvider);
+                final timeLeft = widget.isReviewMode
+                    ? 0
+                    : (quizState?.timeLeft ?? 0);
+                final timePerQuestion = widget.isReviewMode
+                    ? 0
+                    : ref.read(quizControllerProvider.notifier).timePerQuestion;
+
+                return _QuizHeader(
+                  currentIndex: currentIndex,
+                  totalQuestions: totalQuestions,
+                  timeLeft: timeLeft,
+                  timePerQuestion: timePerQuestion,
+                  isReviewMode: widget.isReviewMode,
+                  onClose: () => _handleClose(context),
+                  onReport: () =>
+                      _showReportDialog(context, question, quiz.id, quiz.title),
+                  onHint: question.hint != null
+                      ? () => _showHintSnackBar(context, question.hint!)
+                      : null,
+                  onShare: widget.isReviewMode
+                      ? () => _showShareDialog(
+                          context,
+                          question,
+                          currentIndex,
+                          quiz.title,
+                          quiz.category,
+                        )
+                      : null,
+                );
+              },
             ),
 
-            // 2. Scrollable Content (Question & Options)
             Expanded(
               child: ListView(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
+                  horizontal: 20,
                   vertical: 24,
-                ),
+                ).copyWith(top: 12),
                 physics: const BouncingScrollPhysics(),
                 children: [
-                  // Question Section
-                  _QuestionDisplay(
-                        question: question,
-                        onReport: () => _showReportDialog(
-                          context,
-                          question,
-                          quiz.id,
-                          quiz.title,
-                        ),
-                      )
+                  // Question display - static, doesn't depend on userAnswers
+                  _QuestionDisplay(question: question)
                       .animate(key: ValueKey(currentIndex))
                       .fadeIn(duration: 400.ms)
                       .slideY(begin: 0.1, end: 0, curve: Curves.easeOutQuad),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 12),
 
-                  // Options Section
-                  Text(
-                    question.type == QuizQuestionType.multiple
-                        ? 'Select all that apply:'
-                        : 'Select an answer:',
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.5),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ).animate().fadeIn(delay: 200.ms),
-
-                  const SizedBox(height: 16),
-
-                  ...List.generate(question.options.length, (index) {
-                    bool isSelected = false;
-                    if (userAnswer != null) {
-                      if (userAnswer.selectedIndices.isNotEmpty) {
-                        isSelected = userAnswer.selectedIndices.contains(index);
-                      } else {
-                        isSelected = userAnswer.selectedOptionIndex == index;
-                      }
-                    }
-
-                    bool isCorrect = false;
-                    if (question.type == QuizQuestionType.multiple) {
-                      isCorrect = question.correctIndices.contains(index);
-                      if (question.correctIndices.isEmpty &&
-                          question.correctOptionIndex == index) {
-                        isCorrect = true;
-                      }
-                    } else {
-                      isCorrect = question.correctOptionIndex == index;
-                    }
-
-                    // Interaction Logic
-                    final VoidCallback? onTap = widget.isReviewMode
-                        ? null
-                        : () {
-                            ref
-                                .read(quizControllerProvider.notifier)
-                                .answerQuestion(index);
-                          };
-
-                    return _OptionTile(
-                          text: question.options[index],
-                          index: index,
-                          isSelected: isSelected,
+                  // Selection type hint
+                  if (!widget.isReviewMode)
+                    _SelectionTypeHint(
                           isMultiple:
                               question.type == QuizQuestionType.multiple,
-                          // In review mode, show if it is correct OR if it was the user's wrong selection
-                          isCorrectContext: widget.isReviewMode
-                              ? isCorrect
-                              : null,
-                          isWrongContext: widget.isReviewMode
-                              ? (isSelected && !isCorrect)
-                              : null,
-                          onTap: onTap,
                         )
-                        .animate(key: ValueKey('${currentIndex}_$index'))
-                        .fadeIn(
-                          delay: Duration(milliseconds: 100 + (index * 50)),
-                        )
-                        .slideX(begin: 0.05, end: 0);
-                  }),
+                        .animate(key: ValueKey(currentIndex))
+                        .fadeIn(delay: 200.ms)
+                        .slideX(begin: -0.05, end: 0),
 
-                  // Explanation (Review Mode Only)
+                  const SizedBox(height: 20),
+
+                  // Options section - isolated with its own Consumer
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final userAnswers = ref.watch(
+                        quizControllerProvider.select(
+                          (state) => state?.userAnswers ?? [],
+                        ),
+                      );
+
+                      final UserAnswer? userAnswer = widget.isReviewMode
+                          ? widget.quizResult!.answers.firstWhere(
+                              (a) => a.questionIndex == currentIndex,
+                              orElse: () => UserAnswer(
+                                questionIndex: currentIndex,
+                                selectedOptionIndex: -1,
+                                answeredAt: DateTime.now(),
+                              ),
+                            )
+                          : userAnswers.cast<UserAnswer?>().firstWhere(
+                              (a) => a?.questionIndex == currentIndex,
+                              orElse: () => null,
+                            );
+
+                      return Column(
+                        children: List.generate(question.options.length, (
+                          index,
+                        ) {
+                          bool isSelected = false;
+                          if (userAnswer != null) {
+                            if (userAnswer.selectedIndices.isNotEmpty) {
+                              isSelected = userAnswer.selectedIndices.contains(
+                                index,
+                              );
+                            } else {
+                              isSelected =
+                                  userAnswer.selectedOptionIndex == index;
+                            }
+                          }
+
+                          bool isCorrect = false;
+                          if (question.type == QuizQuestionType.multiple) {
+                            isCorrect = question.correctIndices.contains(index);
+                            if (question.correctIndices.isEmpty &&
+                                question.correctOptionIndex == index) {
+                              isCorrect = true;
+                            }
+                          } else {
+                            isCorrect = question.correctOptionIndex == index;
+                          }
+
+                          final VoidCallback? onTap = widget.isReviewMode
+                              ? null
+                              : () {
+                                  ref
+                                      .read(quizControllerProvider.notifier)
+                                      .answerQuestion(index);
+                                };
+
+                          return _OptionTile(
+                            text: question.options[index],
+                            index: index,
+                            isSelected: isSelected,
+                            isMultiple:
+                                question.type == QuizQuestionType.multiple,
+                            isCorrectContext: widget.isReviewMode
+                                ? isCorrect
+                                : null,
+                            isWrongContext: widget.isReviewMode
+                                ? (isSelected && !isCorrect)
+                                : null,
+                            onTap: onTap,
+                          );
+                        }),
+                      );
+                    },
+                  ),
+
                   if (widget.isReviewMode) ...[
                     const SizedBox(height: 24),
                     _ExplanationCard(explanation: question.explanation)
                         .animate()
                         .fadeIn(delay: 400.ms)
                         .slideY(begin: 0.1, end: 0),
-                    const SizedBox(height: 80), // Bottom padding for FAB
+                    const SizedBox(height: 80),
                   ],
                 ],
               ),
             ),
 
-            // 3. Fixed Bottom Action Bar
-            _BottomActionBar(
-              isReviewMode: widget.isReviewMode,
-              isAnswered: isAnswered,
-              isLastQuestion: currentIndex == totalQuestions - 1,
-              canGoBack: currentIndex > 0,
-              onNext: () {
-                if (widget.isReviewMode) {
-                  setState(() => _reviewIndex++);
-                  _scrollToTop();
-                } else {
-                  ref.read(quizControllerProvider.notifier).nextQuestion();
-                  _scrollToTop();
-                }
+            // Bottom bar with its own Consumer for isAnswered and canGoPrevious
+            Consumer(
+              builder: (context, ref, _) {
+                final userAnswers = ref.watch(
+                  quizControllerProvider.select(
+                    (state) => state?.userAnswers ?? [],
+                  ),
+                );
+                final isAnswered =
+                    widget.isReviewMode ||
+                    userAnswers.any((a) => a.questionIndex == currentIndex);
+
+                // Check if we can go to previous question
+                final canGoPrevious = widget.isReviewMode
+                    ? currentIndex > 0
+                    : ref.read(quizControllerProvider.notifier).canGoPrevious;
+
+                return _BottomActionBar(
+                  isReviewMode: widget.isReviewMode,
+                  isAnswered: isAnswered,
+                  currentIndex: currentIndex,
+                  totalQuestions: totalQuestions,
+                  canGoPrevious: canGoPrevious,
+                  onNext: () {
+                    if (widget.isReviewMode) {
+                      setState(() => _reviewIndex++);
+                      _scrollToTop();
+                    } else {
+                      ref.read(quizControllerProvider.notifier).nextQuestion();
+                      _scrollToTop();
+                    }
+                  },
+                  onPrevious: () {
+                    if (widget.isReviewMode) {
+                      if (currentIndex > 0) {
+                        setState(() => _reviewIndex--);
+                        _scrollToTop();
+                      }
+                    } else {
+                      // Try to go to previous question, if can't then exit
+                      final wentBack = ref
+                          .read(quizControllerProvider.notifier)
+                          .previousQuestion();
+                      if (wentBack) {
+                        _scrollToTop();
+                      } else {
+                        // Already at first question, exit quiz
+                        _handleClose(context);
+                      }
+                    }
+                  },
+                  onCloseReview: () => Navigator.pop(context),
+                );
               },
-              onPrevious: () {
-                setState(() => _reviewIndex--);
-                _scrollToTop();
-              },
-              onCloseReview: () => Navigator.pop(context),
             ),
           ],
         ),
@@ -269,7 +333,13 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
 
   void _handleClose(BuildContext context) {
     if (widget.isReviewMode) {
-      Navigator.pop(context);
+      if (widget.returnPath != null) {
+        context.go(widget.returnPath!);
+      } else if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/dashboard');
+      }
     } else {
       showDialog(
         context: context,
@@ -286,6 +356,8 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
                 Navigator.pop(c);
                 if (widget.returnPath != null) {
                   context.go(widget.returnPath!);
+                } else if (context.canPop()) {
+                  context.pop();
                 } else {
                   context.go('/dashboard');
                 }
@@ -296,6 +368,37 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
         ),
       );
     }
+  }
+
+  void _showHintSnackBar(BuildContext context, String hint) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Hint: $hint'),
+        behavior: SnackBarBehavior.floating,
+        showCloseIcon: true,
+      ),
+    );
+  }
+
+  void _showShareDialog(
+    BuildContext context,
+    QuizQuestion question,
+    int questionIndex,
+    String quizTitle,
+    String category,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ShareQuestionBottomSheet(
+        question: question,
+        questionIndex: questionIndex,
+        quizTitle: quizTitle,
+        category: category,
+      ),
+    );
   }
 
   Widget _buildNoQuizState() =>
@@ -309,96 +412,21 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
     String quizId,
     String quizTitle,
   ) {
-    final reasons = [
-      'Inappropriate content',
-      'Incorrect answer/question',
-      'Spam or misleading',
-      'Other',
-    ];
-
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Report Question'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: reasons
-              .map(
-                (reason) => ListTile(
-                  title: Text(reason),
-                  onTap: () {
-                    Navigator.pop(c);
-                    if (reason == 'Other') {
-                      _showOtherReasonDialog(
-                        context,
-                        question,
-                        quizId,
-                        quizTitle,
-                      );
-                    } else {
-                      _submitReport(
-                        question,
-                        reason,
-                        quizId,
-                        quizTitle: quizTitle,
-                      );
-                    }
-                  },
-                ),
-              )
-              .toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showOtherReasonDialog(
-    BuildContext context,
-    QuizQuestion question,
-    String quizId,
-    String quizTitle,
-  ) {
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Report Details'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Please describe the issue...',
-            border: OutlineInputBorder(),
-          ),
-          maxLines: 3,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('Cancel'),
-          ),
-          AppButton(
-            text: 'Submit',
-            height: 48, // Slightly smaller for dialog
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.pop(c);
-                _submitReport(
-                  question,
-                  'Other',
-                  quizId,
-                  quizTitle: quizTitle,
-                  additionalComments: controller.text.trim(),
-                );
-              }
-            },
-          ),
-        ],
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => ReportBottomSheet(
+        onSubmit: (reason, comment) {
+          _submitReport(
+            question,
+            reason,
+            quizId,
+            quizTitle: quizTitle,
+            additionalComments: comment,
+          );
+        },
       ),
     );
   }
@@ -431,219 +459,329 @@ class _QuizScreenState extends ConsumerState<QuizScreen>
   }
 }
 
-// SUB-WIDGETS
-
 class _QuizHeader extends StatelessWidget {
   final int currentIndex;
   final int totalQuestions;
-  final String title;
-  final String category;
   final int timeLeft;
+  final int timePerQuestion;
   final bool isReviewMode;
-  final AnimationController pulseController;
   final VoidCallback onClose;
+  final VoidCallback onReport;
+  final VoidCallback? onHint;
+  final VoidCallback? onShare;
 
   const _QuizHeader({
     required this.currentIndex,
     required this.totalQuestions,
-    required this.title,
-    required this.category,
     required this.timeLeft,
+    required this.timePerQuestion,
     required this.isReviewMode,
-    required this.pulseController,
     required this.onClose,
+    required this.onReport,
+    this.onHint,
+    this.onShare,
   });
 
   @override
   Widget build(BuildContext context) {
-    final progress = (currentIndex + 1) / totalQuestions;
-    final isLowTime = timeLeft <= 10;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      color: Theme.of(context).colorScheme.surface,
+      color: colorScheme.surface,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              IconButton.filledTonal(
-                onPressed: onClose,
-                icon: const Icon(Icons.close, size: 20),
-                style: IconButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                // Leading Close Button
+                IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close, size: 20),
+                  style: IconButton.styleFrom(
+                    backgroundColor: colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    foregroundColor: colorScheme.onSurface,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                // Center Title
+                Expanded(
+                  child: Text(
+                    isReviewMode
+                        ? "Review Mode"
+                        : "Question ${currentIndex + 1} of $totalQuestions",
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+
+                // Actions Row
+                Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    // Report Button
+                    IconButton(
+                      onPressed: onReport,
+                      icon: const Icon(Icons.flag_outlined, size: 20),
+                      style: IconButton.styleFrom(
+                        backgroundColor: colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.5),
+                        foregroundColor: colorScheme.onSurfaceVariant,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      tooltip: "Report",
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Question ${currentIndex + 1} of $totalQuestions',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    const SizedBox(width: 4),
+                    // Share in review mode, Hint otherwise
+                    if (isReviewMode)
+                      IconButton(
+                        onPressed: onShare,
+                        icon: Icon(
+                          Icons.share_rounded,
+                          size: 20,
+                          color: colorScheme.primary,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: colorScheme.primaryContainer
+                              .withValues(alpha: 0.3),
+                          foregroundColor: colorScheme.primary,
+                        ),
+                        tooltip: "Share Question",
+                      )
+                    else
+                      IconButton(
+                        onPressed: onHint,
+                        icon: Icon(
+                          Icons.lightbulb_outline_rounded,
+                          size: 20,
+                          color: onHint != null
+                              ? Colors.amber.shade600
+                              : colorScheme.onSurfaceVariant.withValues(
+                                  alpha: 0.3,
+                                ),
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: onHint != null
+                              ? Colors.amber.withValues(alpha: 0.15)
+                              : colorScheme.surfaceContainerHighest.withValues(
+                                  alpha: 0.3,
+                                ),
+                        ),
+                        tooltip: "Show Hint",
                       ),
-                    ),
                   ],
                 ),
-              ),
-              if (!isReviewMode)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isLowTime
-                        ? Colors.red.withValues(alpha: 0.1)
-                        : Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isLowTime ? Colors.red : Colors.transparent,
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      AnimatedBuilder(
-                        animation: pulseController,
-                        builder: (context, child) => Icon(
-                          Icons.timer_outlined,
-                          size: 16,
-                          color: isLowTime
-                              ? Colors.red.withValues(
-                                  alpha: 0.6 + (pulseController.value * 0.4),
-                                )
-                              : Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _formatTime(timeLeft),
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          color: isLowTime
-                              ? Colors.red
-                              : Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 6,
-              backgroundColor: Theme.of(
-                context,
-              ).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(4),
+              ],
             ),
           ),
+          if (!isReviewMode)
+            _SegmentedProgressBar(
+              currentIndex: currentIndex,
+              totalQuestions: totalQuestions,
+              timeLeft: timeLeft,
+              timePerQuestion: timePerQuestion,
+            ),
         ],
+      ),
+    );
+  }
+}
+
+/// A segmented progress bar where each segment represents a question.
+/// The timer chip moves within the current question's segment.
+class _SegmentedProgressBar extends StatelessWidget {
+  final int currentIndex;
+  final int totalQuestions;
+  final int timeLeft;
+  final int timePerQuestion;
+
+  const _SegmentedProgressBar({
+    required this.currentIndex,
+    required this.totalQuestions,
+    required this.timeLeft,
+    required this.timePerQuestion,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isLowTime = timeLeft <= 5;
+    final isCritical = timeLeft <= 3;
+
+    return SizedBox(
+      height: 32,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final totalWidth = constraints.maxWidth;
+          final segmentWidth = totalWidth / totalQuestions;
+          final chipWidth = 42.0;
+
+          // Calculate chip position within current segment
+          // At full time (e.g., 10s), chip is at the START (left) of segment
+          // At 0 time, chip is at the END (right) of segment
+          final timeProgress = timePerQuestion > 0
+              ? timeLeft / timePerQuestion
+              : 0.0;
+
+          // Current segment boundaries
+          final segmentStart = currentIndex * segmentWidth;
+          final availableWidth = segmentWidth - chipWidth;
+
+          // Chip position: starts at left side, moves to right as time decreases
+          // (1 - timeProgress) means: 0 at full time, 1 at zero time
+          final chipOffset =
+              segmentStart + (availableWidth * (1 - timeProgress));
+          final clampedChipOffset = chipOffset.clamp(
+            0.0,
+            totalWidth - chipWidth,
+          );
+
+          // Fill amount - follows the chip position
+          final totalFill = chipOffset + chipWidth;
+
+          return Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              // Background track
+              Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Filled progress (follows chip) - with smooth color animation
+              TweenAnimationBuilder<Color?>(
+                tween: ColorTween(
+                  end: isCritical
+                      ? colorScheme.error
+                      : isLowTime
+                      ? Colors.orange
+                      : colorScheme.primary,
+                ),
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOut,
+                builder: (context, color, _) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 4,
+                  width: totalFill.clamp(0.0, totalWidth),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Timer chip - with smooth color animation
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 150),
+                curve: Curves.easeOut,
+                left: clampedChipOffset,
+                child: TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(
+                    end: isCritical
+                        ? colorScheme.error
+                        : isLowTime
+                        ? Colors.orange
+                        : colorScheme.primary,
+                  ),
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeInOut,
+                  builder: (context, chipColor, child) => Container(
+                    width: chipWidth,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: chipColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (chipColor ?? colorScheme.primary).withValues(
+                            alpha: 0.3,
+                          ),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      _formatTime(timeLeft),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        fontSize:
+                            (theme.textTheme.labelSmall?.fontSize ?? 11) - 1,
+                        color: isCritical
+                            ? colorScheme.onError
+                            : colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   String _formatTime(int seconds) {
-    final m = (seconds / 60).floor();
     final s = seconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
+    return '${s.toString().padLeft(2, '0')}s';
   }
 }
 
 class _QuestionDisplay extends StatelessWidget {
   final QuizQuestion question;
-  final VoidCallback onReport;
 
-  const _QuestionDisplay({required this.question, required this.onReport});
+  const _QuestionDisplay({required this.question});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return MarkdownBody(
+      data: question.question,
+      selectable: true,
+      styleSheet: _buildProfessionalMarkdownStyle(context, isQuestion: true),
+    );
+  }
+}
+
+class _SelectionTypeHint extends StatelessWidget {
+  final bool isMultiple;
+
+  const _SelectionTypeHint({required this.isMultiple});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'QUESTION',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.primary,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1,
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                if (question.hint != null)
-                  TextButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Hint: ${question.hint}'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.lightbulb_outline, size: 16),
-                    label: const Text('Show Hint'),
-                    style: TextButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: onReport,
-                  icon: const Icon(Icons.flag_outlined, size: 18),
-                  tooltip: 'Report Question',
-                  style: IconButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        Icon(
+          isMultiple ? Icons.check_box_outlined : Icons.radio_button_unchecked,
+          size: 14,
+          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
         ),
-        const SizedBox(height: 16),
-        MarkdownBody(
-          data: question.question,
-          selectable: true,
-          styleSheet: _buildProfessionalMarkdownStyle(
-            context,
-            isQuestion: true,
+        const SizedBox(width: 6),
+        Text(
+          isMultiple ? 'Select all that apply' : 'Select one answer',
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
@@ -673,85 +811,103 @@ class _OptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final letters = ['A', 'B', 'C', 'D', 'E', 'F'];
 
-    Color borderColor = theme.colorScheme.outline.withValues(alpha: 0.2);
-    Color backgroundColor = theme.colorScheme.surface;
-    Color letterBg = theme.colorScheme.surfaceContainerHighest;
-    Color letterColor = theme.colorScheme.onSurface;
+    Color borderColor = theme.colorScheme.outline.withValues(
+      alpha: 0.2,
+    ); // Matching AppOutlinedButton
+    Color backgroundColor = Colors.transparent; // Default transparent
+    Color indicatorBg = theme.colorScheme.surfaceContainerHighest.withValues(
+      alpha: 0.5,
+    );
+    Color indicatorText = theme.colorScheme.onSurfaceVariant;
 
     if (isCorrectContext == true) {
-      borderColor = Colors.green;
-      backgroundColor = Colors.green.withValues(alpha: 0.05);
-      letterBg = Colors.green;
-      letterColor = Colors.white;
+      borderColor = Colors.transparent; // No border
+      backgroundColor = Colors.green.withValues(alpha: 0.1);
+      indicatorBg = Colors.green;
+      indicatorText = Colors.white;
     } else if (isWrongContext == true) {
-      borderColor = Colors.red;
-      backgroundColor = Colors.red.withValues(alpha: 0.05);
-      letterBg = Colors.red;
-      letterColor = Colors.white;
+      borderColor = Colors.transparent; // No border
+      backgroundColor = Colors.red.withValues(alpha: 0.1);
+      indicatorBg = Colors.red;
+      indicatorText = Colors.white;
     } else if (isSelected) {
-      borderColor = theme.colorScheme.primary;
-      backgroundColor = theme.colorScheme.primaryContainer.withValues(
-        alpha: 0.2,
-      );
-      letterBg = theme.colorScheme.primary;
-      letterColor = theme.colorScheme.onPrimary;
+      borderColor = Colors.transparent; // No border when selected
+      backgroundColor = theme.colorScheme.primary.withValues(
+        alpha: 0.08,
+      ); // Lightest shade
+      indicatorBg = theme.colorScheme.primary;
+      indicatorText = theme.colorScheme.onPrimary;
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(
+        bottom: 8,
+      ), // Reduced spacing between tiles
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12), // Reduced internal padding
           decoration: BoxDecoration(
             color: backgroundColor,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: borderColor,
-              width: isSelected || isCorrectContext == true ? 2 : 1,
+              width: 1, // Consistent width
             ),
-            boxShadow: isSelected && isCorrectContext == null
-                ? [
-                    BoxShadow(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : [],
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start, // Top align content
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 28,
-                height: 28,
+              // Selection indicator (checkbox for multi, radio for single)
+              Container(
+                margin: const EdgeInsets.only(
+                  top: 2,
+                ), // Slight offset to align with text cap height
+                width: 20, // Smaller size
+                height: 20, // Smaller size
                 decoration: BoxDecoration(
-                  color: letterBg,
+                  color:
+                      isSelected ||
+                          isCorrectContext == true ||
+                          isWrongContext == true
+                      ? indicatorBg
+                      : Colors.transparent,
                   shape: isMultiple ? BoxShape.rectangle : BoxShape.circle,
-                  borderRadius: isMultiple ? BorderRadius.circular(8) : null,
+                  borderRadius: isMultiple ? BorderRadius.circular(4) : null,
+                  border: Border.all(
+                    color:
+                        isSelected ||
+                            isCorrectContext == true ||
+                            isWrongContext == true
+                        ? indicatorBg
+                        : theme.colorScheme.outline.withValues(alpha: 0.5),
+                    width: 2,
+                  ),
                 ),
                 alignment: Alignment.center,
                 child: isCorrectContext == true
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
+                    ? Icon(
+                        isMultiple ? Icons.check : Icons.circle,
+                        size: isMultiple ? 14 : 10, // Smaller inner icons
+                        color: Colors.white,
+                      )
                     : isWrongContext == true
-                    ? const Icon(Icons.close, size: 16, color: Colors.white)
-                    : Text(
-                        letters[index % letters.length],
-                        style: TextStyle(
-                          color: letterColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
+                    ? const Icon(Icons.close, size: 14, color: Colors.white)
+                    : isSelected
+                    ? Icon(
+                        isMultiple ? Icons.check : Icons.circle,
+                        size: isMultiple ? 14 : 10, // Smaller inner icons
+                        color: indicatorText,
+                      )
+                    : null,
               ),
-              const SizedBox(width: 16),
+              const SizedBox(
+                width: 12,
+              ), // Reduced spacing between indicator and text
               Expanded(
                 child: MarkdownBody(
                   data: text,
@@ -764,6 +920,72 @@ class _OptionTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _BottomActionBar extends StatelessWidget {
+  final bool isReviewMode;
+  final bool isAnswered;
+  final int currentIndex;
+  final int totalQuestions;
+  final bool canGoPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onPrevious;
+  final VoidCallback onCloseReview;
+
+  const _BottomActionBar({
+    required this.isReviewMode,
+    required this.isAnswered,
+    required this.currentIndex,
+    required this.totalQuestions,
+    required this.canGoPrevious,
+    required this.onNext,
+    required this.onPrevious,
+    required this.onCloseReview,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    // Determine back button text based on context
+    final String backButtonText = canGoPrevious ? "Previous" : "Exit";
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          top: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.2),
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: AppOutlinedButton(
+              onPressed: onPrevious,
+              text: backButtonText,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: AppButton(
+              onPressed: isReviewMode
+                  ? (currentIndex == totalQuestions - 1
+                        ? onCloseReview
+                        : onNext)
+                  : (isAnswered ? onNext : null),
+              text: isReviewMode && currentIndex == totalQuestions - 1
+                  ? "Close"
+                  : "Next",
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -817,179 +1039,82 @@ class _ExplanationCard extends StatelessWidget {
   }
 }
 
-class _BottomActionBar extends StatelessWidget {
-  final bool isReviewMode;
-  final bool isAnswered;
-  final bool isLastQuestion;
-  final bool canGoBack;
-  final VoidCallback onNext;
-  final VoidCallback onPrevious;
-  final VoidCallback onCloseReview;
-
-  const _BottomActionBar({
-    required this.isReviewMode,
-    required this.isAnswered,
-    required this.isLastQuestion,
-    required this.canGoBack,
-    required this.onNext,
-    required this.onPrevious,
-    required this.onCloseReview,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(
-              context,
-            ).colorScheme.outlineVariant.withValues(alpha: 0.2),
-          ),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: isReviewMode
-            ? LayoutBuilder(
-                builder: (context, constraints) {
-                  final halfWidth = (constraints.maxWidth - 16) / 2;
-                  return Row(
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        width: canGoBack ? halfWidth : 0,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const NeverScrollableScrollPhysics(),
-                          child: SizedBox(
-                            width: halfWidth,
-                            child: AppOutlinedButton(
-                              onPressed: onPrevious,
-                              icon: const Icon(Icons.arrow_back),
-                              text: 'Previous',
-                            ),
-                          ),
-                        ),
-                      ),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        width: canGoBack ? 16 : 0,
-                      ),
-                      Expanded(
-                        child: isLastQuestion
-                            ? FilledButton.icon(
-                                onPressed: onCloseReview,
-                                icon: const Icon(Icons.check),
-                                label: const Text('Close Review'),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: const StadiumBorder(),
-                                ),
-                              )
-                            : FilledButton.icon(
-                                onPressed: onNext,
-                                icon: const Icon(Icons.arrow_forward),
-                                label: const Text('Next'),
-                                iconAlignment: IconAlignment.end,
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: const StadiumBorder(),
-                                ),
-                              ),
-                      ),
-                    ],
-                  );
-                },
-              )
-            : SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: isAnswered ? onNext : null,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: const StadiumBorder(),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Next Question',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-      ),
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// HELPER: Professional Markdown Styling
-// -----------------------------------------------------------------------------
-
 MarkdownStyleSheet _buildProfessionalMarkdownStyle(
   BuildContext context, {
   required bool isQuestion,
 }) {
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
+  // Use bodyMedium for options (smaller), bodyLarge for questions
+  final baseText = isQuestion
+      ? theme.textTheme.bodyLarge
+      : theme.textTheme.bodyMedium;
 
-  final double pSize = isQuestion ? 16.0 : 15.0;
-  final double codeSize = isQuestion ? 14.0 : 13.0;
+  // All base text is normal weight, as requested.
+  const FontWeight pWeight = FontWeight.normal;
 
   return MarkdownStyleSheet(
-    p: theme.textTheme.bodyLarge?.copyWith(
-      fontSize: pSize,
-      height: 1.6,
+    p: baseText?.copyWith(
+      height: 1.5,
+      fontWeight: pWeight,
       color: colorScheme.onSurface,
     ),
-    strong: theme.textTheme.bodyLarge?.copyWith(
-      fontSize: pSize,
+    pPadding: EdgeInsets.zero,
+    strong: baseText?.copyWith(
       fontWeight: FontWeight.w700,
       color: colorScheme.onSurface,
+    ),
+    em: baseText?.copyWith(
+      fontStyle: FontStyle.italic,
+      color: colorScheme.onSurface,
+    ),
+    code: TextStyle(
+      fontFamily: 'monospace',
+      backgroundColor: colorScheme.surfaceContainerHighest,
+      color: colorScheme.primary,
+      fontSize: (baseText?.fontSize ?? 16.0) - 2,
+      fontWeight: FontWeight.w500,
     ),
     codeblockDecoration: BoxDecoration(
       color: const Color(0xFF1E293B),
       borderRadius: BorderRadius.circular(8),
       border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
     ),
-    codeblockPadding: const EdgeInsets.all(16),
-    code: TextStyle(
-      fontFamily: 'monospace',
-      backgroundColor: colorScheme.surfaceContainerHighest,
-      color: colorScheme.primary,
-      fontSize: codeSize,
-      fontWeight: FontWeight.w500,
-    ),
-    pPadding: EdgeInsets.zero,
+    codeblockPadding: const EdgeInsets.all(12),
     blockquoteDecoration: BoxDecoration(
       color: colorScheme.secondaryContainer.withValues(alpha: 0.2),
       borderRadius: BorderRadius.circular(4),
-      border: Border(left: BorderSide(color: colorScheme.secondary, width: 4)),
+      border: Border(left: BorderSide(color: colorScheme.secondary, width: 3)),
     ),
-    blockquotePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    blockquote: theme.textTheme.bodyMedium?.copyWith(
+    blockquotePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    blockquote: baseText?.copyWith(
       fontStyle: FontStyle.italic,
       color: colorScheme.onSurfaceVariant,
     ),
     listBullet: TextStyle(
       color: colorScheme.primary,
-      fontWeight: FontWeight.bold,
+      fontWeight: FontWeight.normal,
+      fontSize: baseText?.fontSize,
+    ),
+    listIndent: 16,
+    h1: theme.textTheme.titleLarge?.copyWith(
+      fontWeight: FontWeight.w700,
+      color: colorScheme.onSurface,
+    ),
+    h2: theme.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+      color: colorScheme.onSurface,
+    ),
+    h3: theme.textTheme.titleSmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: colorScheme.onSurface,
     ),
     tableBorder: TableBorder.all(
-      color: colorScheme.outline.withValues(alpha: 0.2),
+      color: colorScheme.outline.withValues(alpha: 0.3),
       width: 1,
     ),
-    tableHead: theme.textTheme.bodyMedium?.copyWith(
-      fontWeight: FontWeight.bold,
-    ),
-    tableBody: theme.textTheme.bodyMedium,
+    tableHead: baseText?.copyWith(fontWeight: FontWeight.bold),
+    tableBody: baseText,
+    tableCellsPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
   );
 }

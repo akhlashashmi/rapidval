@@ -10,6 +10,7 @@ import 'package:rapidval/src/features/dashboard/presentation/dashboard_screen.da
 import 'package:rapidval/src/features/history/presentation/history_screen.dart';
 import 'package:rapidval/src/features/history/presentation/history_selection_provider.dart';
 import 'package:rapidval/src/features/quiz/data/quiz_repository.dart';
+import 'package:rapidval/src/features/history/presentation/history_controller.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -227,16 +228,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       height: 52,
                       width: width,
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerLow,
+                        color: colorScheme.primary.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          if (_animController.value > 0.1)
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                        ],
+                        border: Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.12),
+                        ),
                       ),
                       child: _animController.value > 0.05
                           ? ClipRect(
@@ -351,7 +347,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 .read(quizRepositoryProvider)
                                 .deleteQuizzes(ids);
 
-                            ref.invalidate(quizHistoryProvider);
+                            // Invalidate providers to refresh data
+                            ref.invalidate(historyControllerProvider);
                             ref.invalidate(recentQuizResultsProvider);
                             ref.invalidate(dashboardStatsProvider);
 
@@ -383,28 +380,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   );
                 },
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.only(right: 12),
                   child: Center(
                     widthFactor: 1.0,
-                    child: GestureDetector(
-                      onTap: _toggleSearch,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.transparent,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: CircleAvatar(
-                          radius: 22,
-                          backgroundColor: Colors.transparent,
-                          child: Icon(
-                            Icons.search_rounded,
-                            color: colorScheme.onSurfaceVariant,
-                            size: 25,
-                          ),
-                        ),
+                    child: IconButton(
+                      onPressed: _toggleSearch,
+                      icon: Icon(
+                        Icons.search_rounded,
+                        size: 20,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.5),
+                        foregroundColor: colorScheme.onSurfaceVariant,
+                        fixedSize: const Size(40, 40),
                       ),
                     ),
                   ),

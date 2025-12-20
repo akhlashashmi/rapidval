@@ -26,7 +26,10 @@ class AppTextField extends StatelessWidget {
     this.suffix,
     this.height = 56.0,
     this.borderRadius = 16.0,
+    this.enabled = true,
   });
+
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +44,7 @@ class AppTextField extends StatelessWidget {
       textInputAction: textInputAction,
       onFieldSubmitted: (_) => onSubmit?.call(),
       validator: validator,
+      enabled: enabled,
       style: const TextStyle(fontSize: 16),
       decoration: InputDecoration(
         labelText: label,

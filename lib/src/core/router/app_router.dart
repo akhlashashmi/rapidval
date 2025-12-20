@@ -18,6 +18,7 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/auth/presentation/verify_email_screen.dart';
 import '../../features/quiz/domain/quiz_entity.dart';
 import '../../features/dashboard/presentation/create_quiz_screen.dart';
+import '../../features/dashboard/presentation/quiz_setup_screen.dart';
 import '../../features/auth/presentation/user_controller.dart';
 import '../../features/backup/presentation/backup_screen.dart';
 import '../../features/settings/presentation/legal/privacy_policy_screen.dart';
@@ -198,10 +199,17 @@ GoRouter goRouter(Ref ref) {
             _rootNavigatorKey, // Ensure settings covers the nav bar
       ),
       GoRoute(
+        path: '/quiz-setup',
+        builder: (context, state) {
+          final quiz = state.extra as Quiz;
+          return QuizSetupScreen(quiz: quiz);
+        },
+        parentNavigatorKey: _rootNavigatorKey,
+      ),
+      GoRoute(
         path: '/create-quiz',
         builder: (context, state) {
-          final existingQuiz = state.extra as Quiz?;
-          return CreateQuizScreen(existingQuiz: existingQuiz);
+          return const CreateQuizScreen();
         },
         parentNavigatorKey: _rootNavigatorKey,
       ),
